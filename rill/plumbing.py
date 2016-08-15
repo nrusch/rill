@@ -549,7 +549,7 @@ class RuntimeHandler(object):
         try:
             handler(msg)
         except (FlowError, RillRuntimeError) as err:
-            self.send_error(msg.protocol, err, message.id)
+            self.send_error(msg.protocol, err, msg.id)
 
     # Utilities --
 

@@ -63,8 +63,21 @@ def websocket_application_task():
     This greenlet runs the websocket server that responds to remote commands
     that inspect/manipulate the Runtime.
     """
-    host = DEFAULTS['host']
-    port = DEFAULTS['port']
+
+    argp = argparse.ArgumentParser(
+        description='Rill websocket server forwards messages through zermq '
+                    'to rill runtime')
+    argp.add_argument(
+        '--host', default=DEFAULTS['host'], metavar='HOSTNAME',
+        help='Listen host for websocket (default: %(host)s)' % DEFAULTS)
+    argp.add_argument(
+        '--port', type=int, default=DEFAULTS['port'], metavar='PORT',
+        help='Listen port for websocket (default: %(port)d)' % DEFAULTS)
+
+    args = argp.parse_args()
+
+    host = args.host
+    port = args.port
     address = 'ws://{}:{:d}'.format(host, port)
 
     print('Runtime listening at {}'.format(address))
@@ -74,6 +87,9 @@ def websocket_application_task():
     server.serve_forever()
 
 
-if __name__ == "__main__":
+def main():
     gevent.wait([gevent.spawn(websocket_application_task)])
+
+if __name__ == "__main__":
+    main()
 

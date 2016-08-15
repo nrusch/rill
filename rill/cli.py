@@ -10,20 +10,6 @@ def main():
         description='Runtime that responds to commands sent over the network, '
                     'managing and executing graphs.')
     argp.add_argument(
-        '--host', default=DEFAULTS['host'], metavar='HOSTNAME',
-        help='Listen host for websocket (default: %(host)s)' % DEFAULTS)
-    argp.add_argument(
-        '--port', type=int, default=DEFAULTS['port'], metavar='PORT',
-        help='Listen port for websocket (default: %(port)d)' % DEFAULTS)
-    argp.add_argument(
-        '--registry-host', default=DEFAULTS['registry_host'],
-        metavar='HOSTNAME',
-        help='Listen host for registry (default: %(registry_host)s)' % DEFAULTS)
-    argp.add_argument(
-        '--registry-port', type=int, default=DEFAULTS['registry_port'],
-        metavar='PORT',
-        help='Listen port for registry (default: %(registry_port)d)' % DEFAULTS)
-    argp.add_argument(
         '--log-file', metavar='FILE_PATH',
         help='File to send log output to (default: none)')
     argp.add_argument(

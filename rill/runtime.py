@@ -1,7 +1,6 @@
 import os
 import pydoc
 import logging
-import json
 from collections import OrderedDict
 import inspect
 import weakref
@@ -481,10 +480,15 @@ class Runtime(object):
         except KeyError:
             raise RillRuntimeError('Requested graph not found')
 
-    def new_graph(self, graph_id, description=None, metadata=None):
+    def new_graph(
+        self, graph_id, description=None, metadata=None, overwrite=True
+    ):
         """
         Create a new graph.
         """
+        if not overwrite and self._graphs.get(graph_id, None):
+            raise RillRuntimeError('Graph already exists')
+
         self.logger.debug('Graph {}: Initializing'.format(graph_id))
         self.add_graph(graph_id, Graph(
             name=graph_id,
@@ -684,64 +688,16 @@ class Runtime(object):
         self._graphs[new_id] = graph
 
 
-class WebSocketRuntimeApplication(geventwebsocket.WebSocketApplication):
-    """
-    Web socket application that hosts a single ``Runtime`` instance.
-    An instance of this class receives messages over a websocket, delegates
-    message payloads to the appropriate ``Runtime`` methods, and sends
-    responses where applicable.
-    Message structures are defined by the FBP Protocol.
-    """
-
-    def __init__(self, ws):
-        super(WebSocketRuntimeApplication, self).__init__(ws)
-
-        self.client = Client(self.on_response)
-        self.client.connect("tcp://localhost", 5556)
-
-        self.logger = logging.getLogger('{}.{}'.format(
-            self.__class__.__module__, self.__class__.__name__))
-
-    # WebSocketApplication overrides --
-
-    @staticmethod
-    def protocol_name():
-        """
-        WebSocket sub-protocol
-        """
-        return 'noflo'
-
-    def on_message(self, message, **kwargs):
-        self.logger.debug('INCOMING: {}'.format(message))
-        self.client.send(Message(**json.loads(message)))
-
-    def on_response(self, msg):
-        self.logger.debug("OUTCOMING: %r" % msg)
-        self.ws.send(json.dumps(msg.to_dict()))
-
-
 # FIXME: do we need the host?
 def serve_runtime(runtime=None, host=DEFAULTS['host'], port=DEFAULTS['port'],
                   registry_host=DEFAULTS['registry_host'],
                   registry_port=DEFAULTS['registry_port']):
 
     runtime = runtime if runtime is not None else Runtime()
-    address = 'ws://{}:{:d}'.format(host, port)
 
     def runtime_server_task():
         server = RuntimeServer(runtime)
         server.start()
-
-    def websocket_application_task():
-        """
-        This greenlet runs the websocket server that responds to remote commands
-        that inspect/manipulate the Runtime.
-        """
-        print('Runtime listening at {}'.format(address))
-        r = geventwebsocket.Resource(
-            OrderedDict([('/', WebSocketRuntimeApplication)]))
-        server = geventwebsocket.WebSocketServer(('', port), r)
-        server.serve_forever()
 
     def local_registration_task():
         """
@@ -751,7 +707,4 @@ def serve_runtime(runtime=None, host=DEFAULTS['host'], port=DEFAULTS['port'],
         from rill.registry import serve_registry
         serve_registry(registry_host, registry_port, host, port)
 
-    tasks = [runtime_server_task, websocket_application_task]
-
-    # Start!
-    gevent.wait([gevent.spawn(t) for t in tasks])
+    runtime_server_task()

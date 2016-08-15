@@ -1,4 +1,4 @@
-# based on The Clustered Hashmap Protocol: http://rfc.zeromq.org/spec:12/CHP/
+#None based on The Clustered Hashmap Protocol: http://rfc.zeromq.org/spec:12/CHP/
 
 from __future__ import print_function
 import os
@@ -9,11 +9,12 @@ import functools
 import datetime
 import copy
 import uuid
+import traceback
 
 import gevent
 import zmq.green as zmq
-from zmq.eventloop.ioloop import IOLoop, PeriodicCallback
-from zmq.eventloop.zmqstream import ZMQStream
+from zmq.green.eventloop.ioloop import IOLoop, PeriodicCallback
+from zmq.green.eventloop.zmqstream import ZMQStream
 import zmq.utils.jsonapi as json
 from zmq.utils.strtypes import bytes, unicode, asbytes
 
@@ -81,12 +82,12 @@ class Message(object):
     This class is clever about updates to payloads to avoid reserializing
     data.
     """
-    def __init__(self, protocol, command, payload, message_id=None, revision=None):
+    def __init__(self, protocol, command, payload, id=None, revision=None):
         self.protocol = protocol
         self.command = command
         self._raw_payload = None
         self._payload = payload
-        self._id = message_id
+        self._id = id
         self.revision = revision
         self.graph_id = None
 
@@ -199,10 +200,10 @@ class Message(object):
             key = self.protocol
 
         frames = [
-            key,
-            self.command,
-            self.raw_payload,
-            self.id
+            bytes(key),
+            bytes(self.command),
+            bytes(self.raw_payload),
+            bytes(self.id)
         ]
         if prefix:
             frames.insert(0, prefix)
@@ -223,7 +224,7 @@ class Client(object):
         # cache of our graph value
         self.graph = None
 
-    def watch_graph(self, graph, sync=True):
+    def watch_graph(self, graph, message_id, sync=True):
         """
         Receive update messages for a graph.
 
@@ -231,7 +232,8 @@ class Client(object):
         """
         self.graph = graph
         # FIXME: we should probably just use json here
-        self.pipe.send_multipart([b"SUBSCRIBE", graph, bytes(int(sync))])
+        self.pipe.send_multipart([
+            b"SUBSCRIBE", bytes(graph), bytes(message_id), bytes(int(sync))])
 
     def connect(self, address, port):
         """
@@ -243,6 +245,9 @@ class Client(object):
             [b"CONNECT",
              (address.encode() if isinstance(address, str) else address),
              b'%d' % port])
+
+    def disconnect(self):
+        self.agent.kill()
 
     def send(self, msg):
         """
@@ -259,10 +264,10 @@ class Client(object):
             # 'addgraph': creates a new graph or fails if it exists
             print(msg.payload)
             # subscribe to the graph
-            self.watch_graph(msg.payload['id'], sync=False)
+            self.watch_graph(msg.payload['id'], message_id=msg.id, sync=False)
         elif (msg.protocol, msg.command) == ('graph', 'watch'):
             # subscribe to the graph: this will trigger a state sync
-            self.watch_graph(msg.payload['id'], sync=True)
+            self.watch_graph(msg.payload['id'], message_id=msg.id, sync=True)
             # no changes are required server-side: nothing else left to do.
             return
 
@@ -357,11 +362,12 @@ class ClientAgent(object):
             print("sending message to server")
             self.publisher.send_multipart(msg)
         elif command == b"SUBSCRIBE":
-            graph, sync = msg
+            graph, message_id, sync = msg
             self.connection.watch_graph(graph)
             if bool(int(sync)):
                 # trigger sync
                 self.graph = graph
+                self.message_id = message_id
 
 
 def client_agent_loop(ctx, pipe, on_recv):
@@ -395,10 +401,13 @@ def client_agent_loop(ctx, pipe, on_recv):
         elif agent.state == STATE_ACTIVE:
             if agent.graph:
                 print("switching to graph sync state")
-                Message(b'internal', b'startsync', agent.graph).sendto(conn.snapshot)
+                Message(
+                    'internal', 'startsync', agent.graph, agent.message_id
+                ).sendto(conn.snapshot)
                 # wipe the graph subscription request so that we don't get
                 # here unless the graph has changed
                 agent.graph = None
+                agent.message_id = None
                 conn.expiry = time.time() + SERVER_TTL
                 agent.state = STATE_SYNCING
                 server_socket = conn.snapshot
@@ -469,6 +478,8 @@ def client_agent_loop(ctx, pipe, on_recv):
                     #                  agent.revision, kvmsg.key)
             else:
                 raise RuntimeError("This should not be possible")
+        else:
+            gevent.sleep(0)
         # FIXME: add heartbeat back?
         # else:
         #     # Server has died, failover to next
@@ -514,6 +525,8 @@ class RuntimeHandler(object):
         ----------
         msg : Message
         """
+        from rill.runtime import RillRuntimeError
+
         dispatch = {
             # 'runtime': self.handle_runtime,
             # 'component': self.handle_component,
@@ -535,8 +548,8 @@ class RuntimeHandler(object):
 
         try:
             handler(msg)
-        except FlowError as err:
-            self.send_error(msg.protocol, str(err))
+        except (FlowError, RillRuntimeError) as err:
+            self.send_error(msg.protocol, err, message.id)
 
     # Utilities --
 
@@ -630,6 +643,7 @@ class RuntimeHandler(object):
         """
         command = msg.command
         payload = msg.payload
+        message_id = msg.id
 
         def get_graph():
             try:
@@ -651,6 +665,13 @@ class RuntimeHandler(object):
                 payload['id'],
                 payload.get('description', None),
                 payload.get('metadata', None)
+            )
+        if command == 'addgraph':
+            self.runtime.new_graph(
+                payload['id'],
+                payload.get('description', None),
+                payload.get('metadata', None),
+                overwrite=False
             )
         # Nodes
         elif command == 'addnode':
@@ -793,6 +814,14 @@ class RuntimeHandler(object):
 
         self.send_network_status(msg, reply)
 
+    def send_error(self, protocol, err, message_id):
+        Message(protocol, 'error', {
+            'message': err.message,
+            'stack': traceback.format_exc(),
+            'request_id': message_id
+        }).sendto(
+            self.snapshot, identity)
+
 
 class RuntimeServer(object):
     """
@@ -823,7 +852,7 @@ class RuntimeServer(object):
 
         # Wrap sockets in ZMQStreams for IOLoop handlers
         self.snapshot = ZMQStream(self.snapshot)
-        # self.publisher = ZMQStream(self.publisher)  # only necessary for heartbeat
+        self.publisher = ZMQStream(self.publisher)  # only necessary for heartbeat
         self.collector = ZMQStream(self.collector)
 
         # Register handlers with reactor
@@ -846,23 +875,32 @@ class RuntimeServer(object):
 
     def handle_snapshot(self, msg):
         """snapshot requests"""
+        from rill.runtime import RillRuntimeError
+
         identity = msg.pop(0)
         msg = Message.from_frames(*msg)
+
         print("handle_snapshot: %r" % msg)
+
         if (msg.protocol, msg.command) == ('internal', 'startsync'):
             if msg.payload:
                 graph_id = msg.payload
                 print("Graph id: %s" % graph_id)
-                # send the graph state
-                graph = self.runtime.get_graph(graph_id)
-                for command, payload in get_graph_messages(graph, graph_id):
-                    Message(b'graph', command, payload).sendto(
+
+                try:
+                    graph = self.runtime.get_graph(graph_id)
+                    for command, payload in get_graph_messages(graph, graph_id):
+                        Message(b'graph', command, payload).sendto(
+                            self.snapshot, identity)
+
+                    # send the network status
+                    status = self.handler.get_network_status(graph_id)
+                    Message(b'network', b'status', status).sendto(
                         self.snapshot, identity)
 
-                # send the network status
-                status = self.handler.get_network_status(graph_id)
-                Message(b'network', b'status', status).sendto(
-                    self.snapshot, identity)
+                except RillRuntimeError as err:
+                    self.send_error('graph', err, msg.id, identity)
+
             else:
                 # initial connection
                 meta = self.runtime.get_runtime_meta()
@@ -902,6 +940,14 @@ class RuntimeServer(object):
 
         # FIXME: should the revision be per-graph?
         self.handler.handle_message(msg)
+
+    def send_error(self, protocol, err, message_id, identity):
+        Message(protocol, 'error', {
+            'message': err.message,
+            'stack': traceback.format_exc(),
+            'request_id': message_id
+        }).sendto(
+            self.snapshot, identity)
 
 
 def run_server():

@@ -307,6 +307,10 @@ class ClientConnection(object):
         self.subscriber.connect("%s:%i" % (address.decode(), port + 1))
         self.subscriber.linger = 0
 
+        # outgoing updates (possible error responses)
+        self.publisher = ctx.socket(zmq.DEALER)
+        self.publisher.connect("%s:%i" % (address.decode(), port + 2))
+
         # subscribed graph
         self.graph = None
 
@@ -336,10 +340,6 @@ class ClientAgent(object):
         # socket to talk back to application
         self.pipe = pipe
         self.state = STATE_INITIAL
-        # outgoing updates (one-way)
-        self.publisher = ctx.socket(zmq.PUSH)
-        # incoming snapshots (two-way)
-        self.router = ctx.socket(zmq.ROUTER)
         # connected RuntimeServer
         self.connection = None
         # subscribed graph: used to trigger a subscription change
@@ -356,11 +356,10 @@ class ClientAgent(object):
             port = int(msg.pop(0))
             assert self.connection is None
             self.connection = ClientConnection(self.ctx, address, port)
-            self.publisher.connect("%s:%i" % (address.decode(), port + 2))
         elif command == b"SEND":
             # push message to the server
             print("sending message to server")
-            self.publisher.send_multipart(msg)
+            self.connection.publisher.send_multipart(msg)
         elif command == b"SUBSCRIBE":
             graph, message_id, sync = msg
             self.connection.watch_graph(graph)
@@ -380,7 +379,7 @@ def client_agent_loop(ctx, pipe, on_recv):
         poll_timer = None
 
         # choose a server socket
-        server_socket = None
+        server_sockets = []
         if agent.state == STATE_INITIAL:
             # In this state we ask the server for a snapshot,
             if agent.connection:
@@ -393,11 +392,11 @@ def client_agent_loop(ctx, pipe, on_recv):
                 conn.expiry = time.time() + SERVER_TTL
                 print("switching to sync state")
                 agent.state = STATE_SYNCING
-                server_socket = conn.snapshot
+                server_sockets = [conn.snapshot]
         elif agent.state == STATE_SYNCING:
             # In this state we read from snapshot and we expect
             # the server to respond.
-            server_socket = conn.snapshot
+            server_sockets = [conn.snapshot]
         elif agent.state == STATE_ACTIVE:
             if agent.graph:
                 print("switching to graph sync state")
@@ -410,17 +409,18 @@ def client_agent_loop(ctx, pipe, on_recv):
                 agent.message_id = None
                 conn.expiry = time.time() + SERVER_TTL
                 agent.state = STATE_SYNCING
-                server_socket = conn.snapshot
+                server_sockets = [conn.snapshot]
             else:
                 # In this state we read from subscriber.
-                server_socket = conn.subscriber
+                server_sockets = [conn.subscriber, conn.publisher]
 
         # we don't process messages from the client until we're done syncing.
         if agent.state != STATE_SYNCING:
             poller.register(agent.pipe, zmq.POLLIN)
-        if server_socket:
+        if len(server_sockets):
             # we have a second socket to poll:
-            poller.register(server_socket, zmq.POLLIN)
+            for server_socket in server_sockets:
+                poller.register(server_socket, zmq.POLLIN)
 
         if conn is not None:
             poll_timer = 1e3 * max(0, conn.expiry - time.time())
@@ -433,51 +433,55 @@ def client_agent_loop(ctx, pipe, on_recv):
             raise  # DEBUG
             break  # Context has been shut down
 
-        if agent.pipe in items:
-            print("Control message")
-            agent.handle_message()
-        elif server_socket in items:
-            print("Server message")
-            msg = Message.from_frames(*server_socket.recv_multipart())
-            # Anything from server resets its expiry time
-            conn.expiry = time.time() + SERVER_TTL
-            if agent.state == STATE_SYNCING:
-                conn.requests = 0
-                if (msg.protocol, msg.command) == ('internal', 'endsync'):
-                    # done syncing
-                    assert isinstance(msg.payload, int)
-                    agent.revision = msg.payload
-                    print("switching to active state")
-                    agent.state = STATE_ACTIVE
-                    logging.info("I: received from %s:%d snapshot=%d",
-                                 conn.address, conn.port, agent.revision)
-                    # FIXME: send componentsready?
-                    # self.send('component', 'componentsready')
+        if len(items.keys()):
+            for socket in items.keys():
+                if socket is agent.pipe:
+                    print("Control message")
+                    agent.handle_message()
                 else:
-                    logging.info("I: received from %s:%d %s %d",
-                                 conn.address, conn.port, msg, agent.revision)
-                    on_recv(msg)
+                    server_socket = socket
+                    print("Server message")
+                    msg = Message.from_frames(*server_socket.recv_multipart())
+                    # Anything from server resets its expiry time
+                    conn.expiry = time.time() + SERVER_TTL
+                    if agent.state == STATE_SYNCING:
+                        conn.requests = 0
+                        if (msg.protocol, msg.command) == ('internal', 'endsync'):
+                            # done syncing
+                            assert isinstance(msg.payload, int)
+                            agent.revision = msg.payload
+                            print("switching to active state")
+                            agent.state = STATE_ACTIVE
+                            logging.info("I: received from %s:%d snapshot=%d",
+                                         conn.address, conn.port, agent.revision)
+                            # FIXME: send componentsready?
+                            # self.send('component', 'componentsready')
+                        else:
+                            logging.info("I: received from %s:%d %s %d",
+                                conn.address, conn.port, msg, agent.revision)
+                            on_recv(msg)
 
-            elif agent.state == STATE_ACTIVE:
-                # Receive message published from server.
-                # Discard out-of-revision updates, incl. hugz
-                print("msg %r" % msg)
-                assert isinstance(msg.revision, int)
-                if msg.revision > agent.revision:
-                    agent.revision = msg.revision
+                    elif agent.state == STATE_ACTIVE:
+                        # Receive message published from server.
+                        # Discard out-of-revision updates, incl. hugz
+                        print("msg %r" % msg)
+                        assert isinstance(msg.revision, int)
+                        if msg.revision > agent.revision or msg.command == 'error':
+                            agent.revision = msg.revision
 
-                    on_recv(msg)
+                            on_recv(msg)
 
-                    logging.info("I: received from %s:%d %s",
-                                 conn.address, conn.port, msg)
-                else:
-                    print("Sequence is too low: %d < %d" % (msg.revision, agent.revision))
-                    # if kvmsg.key != b"HUGZ":
-                    #     logging.info("I: received from %s:%d %s=%d %s",
-                    #                  server.address, server.port, 'UPDATE',
-                    #                  agent.revision, kvmsg.key)
-            else:
-                raise RuntimeError("This should not be possible")
+                            logging.info("I: received from %s:%d %s",
+                                         conn.address, conn.port, msg)
+                        else:
+                            print("Sequence is too low: %d < %d" %
+                                    (msg.revision, agent.revision))
+                            # if kvmsg.key != b"HUGZ":
+                            #     logging.info("I: received from %s:%d %s=%d %s",
+                            #                  server.address, server.port, 'UPDATE',
+                            #                  agent.revision, kvmsg.key)
+                    else:
+                        raise RuntimeError("This should not be possible")
         else:
             gevent.sleep(0)
         # FIXME: add heartbeat back?
@@ -492,13 +496,14 @@ class RuntimeHandler(object):
     """
     Utility class for processing messages into changes to a Runtime
     """
-    def __init__(self, runtime, socket):
+    def __init__(self, runtime, socket, responder):
         self.runtime = runtime
         # current revision of runtime state. used to ensure sync between
         # snapshot and subsequent publishes
         self.revision = 0
         # socket we're sending output changes on
         self.socket = socket
+        self.responder = responder
         self.logger = logging.getLogger('{}.{}'.format(
             self.__class__.__module__, self.__class__.__name__))
 
@@ -517,7 +522,7 @@ class RuntimeHandler(object):
         # print("Re-publishing with key %r" % key)
         msg.sendto(self.socket)
 
-    def handle_message(self, msg):
+    def handle_message(self, msg, identity):
         """
         Main entry point for handing a message
 
@@ -549,7 +554,7 @@ class RuntimeHandler(object):
         try:
             handler(msg)
         except (FlowError, RillRuntimeError) as err:
-            self.send_error(msg.protocol, err, msg.id)
+            self.send_error(msg.protocol, err, msg.id, identity)
 
     # Utilities --
 
@@ -814,12 +819,12 @@ class RuntimeHandler(object):
 
         self.send_network_status(msg, reply)
 
-    def send_error(self, protocol, err, message_id):
+    def send_error(self, protocol, err, message_id, identity):
         Message(protocol, 'error', {
             'message': err.message,
             'stack': traceback.format_exc(),
             'request_id': message_id
-        }).sendto(self.socket)
+        }, revision=self.revision).sendto(self.responder, identity)
 
 
 class RuntimeServer(object):
@@ -843,7 +848,7 @@ class RuntimeServer(object):
         # Publish updates to clients
         self.publisher = self.ctx.socket(zmq.PUB)
         # Collect updates from clients
-        self.collector = self.ctx.socket(zmq.PULL)
+        self.collector = self.ctx.socket(zmq.ROUTER)
 
         self.snapshot.bind("tcp://*:%d" % self.port)
         self.publisher.bind("tcp://*:%d" % (self.port + 1))
@@ -858,7 +863,7 @@ class RuntimeServer(object):
         self.snapshot.on_recv(self.handle_snapshot)
         self.collector.on_recv(self.handle_collect)
 
-        self.handler = RuntimeHandler(runtime, self.publisher)
+        self.handler = RuntimeHandler(runtime, self.publisher, self.collector)
 
     def start(self):
         print("Server listening on port %d" % self.port)
@@ -867,6 +872,9 @@ class RuntimeServer(object):
             self.loop.start()
         except KeyboardInterrupt:
             pass
+
+    def stop(self):
+        self.loop.stop()
 
     # def publish(self, key, command, payload, id, revision):
     #     self.publisher.send_multipart(
@@ -934,18 +942,20 @@ class RuntimeServer(object):
         """
         handle messages pushed from client
         """
-        msg = Message.from_frames(*msg)
+        original_message = msg
+        identity = msg[0]
+        msg = Message.from_frames(*msg[1:])
         print("handle_collect: %s" % str(msg))
 
         # FIXME: should the revision be per-graph?
-        self.handler.handle_message(msg)
+        self.handler.handle_message(msg, identity)
 
     def send_error(self, protocol, err, message_id, identity):
         Message(protocol, 'error', {
             'message': err.message,
             'stack': traceback.format_exc(),
             'request_id': message_id
-        }).sendto(
+        }, revision=self.handler.revision).sendto(
             self.snapshot, identity)
 
 

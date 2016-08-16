@@ -288,10 +288,10 @@ class ClientConnection(object):
         # server port
         self.port = port
 
-        # Snapshot updates from server (one-to-one)
-        self.snapshot = ctx.socket(zmq.DEALER)
-        self.snapshot.linger = 0
-        self.snapshot.connect("%s:%i" % (address.decode(), port))
+        # outgoing updates (responses for snapshots and errors)
+        self.publisher = ctx.socket(zmq.DEALER)
+        self.publisher.linger = 0
+        self.publisher.connect("%s:%i" % (address.decode(), port))
 
         # Incoming updates from server (one-to-many)
         # NOTE:
@@ -306,10 +306,6 @@ class ClientConnection(object):
         self.subscriber.setsockopt(zmq.SUBSCRIBE, b'component')
         self.subscriber.connect("%s:%i" % (address.decode(), port + 1))
         self.subscriber.linger = 0
-
-        # outgoing updates (possible error responses)
-        self.publisher = ctx.socket(zmq.DEALER)
-        self.publisher.connect("%s:%i" % (address.decode(), port + 2))
 
         # subscribed graph
         self.graph = None
@@ -387,29 +383,29 @@ def client_agent_loop(ctx, pipe, on_recv):
                 print("I: waiting for server at %s:%d..." % (conn.address, conn.port))
                 # FIXME: why 2?  I think this may have to do with MAX_SERVER
                 if conn.requests < 2:
-                    Message(b'internal', b'startsync', b'').sendto(conn.snapshot)
+                    Message(b'internal', b'startsync', b'').sendto(conn.publisher)
                     conn.requests += 1
                 conn.expiry = time.time() + SERVER_TTL
                 print("switching to sync state")
                 agent.state = STATE_SYNCING
-                server_sockets = [conn.snapshot]
+                server_sockets = [conn.publisher]
         elif agent.state == STATE_SYNCING:
             # In this state we read from snapshot and we expect
             # the server to respond.
-            server_sockets = [conn.snapshot]
+            server_sockets = [conn.publisher]
         elif agent.state == STATE_ACTIVE:
             if agent.graph:
                 print("switching to graph sync state")
                 Message(
                     'internal', 'startsync', agent.graph, agent.message_id
-                ).sendto(conn.snapshot)
+                ).sendto(conn.publisher)
                 # wipe the graph subscription request so that we don't get
                 # here unless the graph has changed
                 agent.graph = None
                 agent.message_id = None
                 conn.expiry = time.time() + SERVER_TTL
                 agent.state = STATE_SYNCING
-                server_sockets = [conn.snapshot]
+                server_sockets = [conn.publisher]
             else:
                 # In this state we read from subscriber.
                 server_sockets = [conn.subscriber, conn.publisher]
@@ -843,25 +839,20 @@ class RuntimeServer(object):
 
         # Set up our client server sockets
 
-        # Handle snapshot requests
-        self.snapshot = self.ctx.socket(zmq.ROUTER)
         # Publish updates to clients
         self.publisher = self.ctx.socket(zmq.PUB)
-        # Collect updates from clients
+        # Collect updates and snapshot requests from clients
         self.collector = self.ctx.socket(zmq.ROUTER)
 
-        self.snapshot.bind("tcp://*:%d" % self.port)
+        self.collector.bind("tcp://*:%d" % (self.port))
         self.publisher.bind("tcp://*:%d" % (self.port + 1))
-        self.collector.bind("tcp://*:%d" % (self.port + 2))
 
         # Wrap sockets in ZMQStreams for IOLoop handlers
-        self.snapshot = ZMQStream(self.snapshot)
         self.publisher = ZMQStream(self.publisher)  # only necessary for heartbeat
         self.collector = ZMQStream(self.collector)
 
         # Register handlers with reactor
-        self.snapshot.on_recv(self.handle_snapshot)
-        self.collector.on_recv(self.handle_collect)
+        self.collector.on_recv(self.handle_message)
 
         self.handler = RuntimeHandler(runtime, self.publisher, self.collector)
 
@@ -880,12 +871,18 @@ class RuntimeServer(object):
     #     self.publisher.send_multipart(
     #         [key, command, payload, id, bytes(revision)])
 
-    def handle_snapshot(self, msg):
-        """snapshot requests"""
-        from rill.runtime import RillRuntimeError
-
+    def handle_message(self, msg):
         identity = msg.pop(0)
         msg = Message.from_frames(*msg)
+
+        if msg.protocol == 'internal':
+            self.handle_snapshot(msg, identity)
+        else:
+            self.handle_collect(msg, identity)
+
+    def handle_snapshot(self, msg, identity):
+        """snapshot requests"""
+        from rill.runtime import RillRuntimeError
 
         print("handle_snapshot: %r" % msg)
 
@@ -898,12 +895,12 @@ class RuntimeServer(object):
                     graph = self.runtime.get_graph(graph_id)
                     for command, payload in get_graph_messages(graph, graph_id):
                         Message(b'graph', command, payload).sendto(
-                            self.snapshot, identity)
+                            self.collector, identity)
 
                     # send the network status
                     status = self.handler.get_network_status(graph_id)
                     Message(b'network', b'status', status).sendto(
-                        self.snapshot, identity)
+                        self.collector, identity)
 
                 except RillRuntimeError as err:
                     self.send_error('graph', err, msg.id, identity)
@@ -912,20 +909,20 @@ class RuntimeServer(object):
                 # initial connection
                 meta = self.runtime.get_runtime_meta()
                 Message(b'runtime', b'runtime', meta).sendto(
-                    self.snapshot, identity)
+                    self.collector, identity)
 
                 # send list of component specs
                 # FIXME: move this under 'runtime' protocol?
                 for spec in self.runtime.get_all_component_specs():
                     Message(b'component', b'component', spec).sendto(
-                        self.snapshot, identity)
+                        self.collector, identity)
 
                 # send list of graphs
                 # FIXME: move this under 'runtime' protocol?
                 # FIXME: notify subscribers about new graphs in handle_collect
                 for graph_id in self.runtime._graphs.keys():
                     Message(b'graph', b'graph', {'id': graph_id}).sendto(
-                        self.snapshot, identity)
+                        self.collector, identity)
 
         else:
             print("E: bad request, aborting")
@@ -936,15 +933,12 @@ class RuntimeServer(object):
         # Now send END message with revision number
         logging.info("I: Sending state shapshot=%d" % self.handler.revision)
         Message(b'internal', b'endsync', self.handler.revision).sendto(
-            self.snapshot, identity)
+            self.collector, identity)
 
-    def handle_collect(self, msg):
+    def handle_collect(self, msg, identity):
         """
         handle messages pushed from client
         """
-        original_message = msg
-        identity = msg[0]
-        msg = Message.from_frames(*msg[1:])
         print("handle_collect: %s" % str(msg))
 
         # FIXME: should the revision be per-graph?
@@ -956,7 +950,7 @@ class RuntimeServer(object):
             'stack': traceback.format_exc(),
             'request_id': message_id
         }, revision=self.handler.revision).sendto(
-            self.snapshot, identity)
+            self.collector, identity)
 
 
 def run_server():

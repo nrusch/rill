@@ -147,6 +147,9 @@ class InputPortDefinition(PortDefinition):
             spec['default'] = self.type.to_primitive(self.default)
         if self.name == IN_NULL:
             spec['type'] = 'bang'
+
+        spec['static'] = self.static
+
         return spec
 
 

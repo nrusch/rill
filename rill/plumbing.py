@@ -819,8 +819,7 @@ class RuntimeHandler(object):
             'message': err.message,
             'stack': traceback.format_exc(),
             'request_id': message_id
-        }).sendto(
-            self.snapshot, identity)
+        }).sendto(self.socket)
 
 
 class RuntimeServer(object):

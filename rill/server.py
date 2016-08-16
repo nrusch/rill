@@ -85,7 +85,7 @@ def main():
     host = args.host
     port = args.port
 
-    gevent.wait([gevent.spawn(lambda: websocket_application_task(host, port))])
+    gevent.wait([gevent.spawn(websocket_application_task, host, port)])
 
 if __name__ == "__main__":
     main()

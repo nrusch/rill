@@ -57,14 +57,15 @@ def main():
         runtime.register_module(modname)
 
     gevent.wait([
-        gevent.spawn(lambda: serve_runtime(
+        gevent.spawn(
+            serve_runtime,
             runtime,
             args.host,
             args.port,
             args.registry_host,
             args.registry_port
-        )),
-        gevent.spawn(lambda: websocket_application_task(args.host, args.port))
+        ),
+        gevent.spawn(websocket_application_task, args.host, args.port)
     ])
 
 

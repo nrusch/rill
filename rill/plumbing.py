@@ -782,8 +782,10 @@ class RuntimeHandler(object):
 
     def send_network_data(self, connection, outport, inport, packet):
         edge_id = '{}.{}{} -> {}.{}{}'.format(
-            outport.component.name, outport.name, '[{}]'.format(outport.index),
-            inport.component.name, inport.name, '[{}]'.format(inport.index))
+            outport.component.name, outport.name,
+            '[{}]'.format(outport.index) if outport.index else '',
+            inport.component.name, inport.name,
+            '[{}]'.format(inport.index) if inport.index else '')
 
         msg = Message('network', 'data', {
             'src': {

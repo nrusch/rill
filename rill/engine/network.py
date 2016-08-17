@@ -800,6 +800,16 @@ class Network(object):
         self.active = True
         deadlock_thread = None
 
+        for comp in self.graph._components.values():
+            for inport in comp.inports:
+                if getattr(inport, '_connection', False):
+                    if isinstance(inport._connection, Connection):
+                        inport._connection.send.event.listen(self.send_data)
+                elif getattr(inport, '_connections', False):
+                    for connection in inport._connections:
+                        if isinstance(connection, Connection):
+                            connection.send.event.listen(self.send_data)
+
         try:
             if resume:
                 self.resume()
@@ -819,6 +829,17 @@ class Network(object):
 
         if deadlock_thread:
             deadlock_thread.kill()
+
+        for comp in self.graph._components.values():
+            for inport in comp.inports:
+                if getattr(inport, '_connection', False):
+                    if isinstance(inport._connection, Connection):
+                        inport._connection.send.event.remove_listener(
+                            self.send_data)
+                elif getattr(inport, '_connections', False):
+                    for connection in inport._connections:
+                        if isinstance(connection, Connection):
+                            connection.send.event.remove_listener(self.send_data)
 
         duration = time.time() - now
         logger.info("Run complete.  Time: %.02f seconds" % duration)
@@ -843,6 +864,11 @@ class Network(object):
         logger.debug("{}: Terminated", args=[comp])
         # self.cdl.count_down()
         # net.interrupt()
+
+    @supports_listeners
+    def send_data(self, connection, outport, inport, packet):
+        self.send_data.event.emit(connection, outport, inport, packet)
+        return
 
     def _build_runners(self):
         """
@@ -1045,6 +1071,16 @@ class Network(object):
         self._abort = True
         for comp in self.runners:
             comp.terminate(new_status)
+
+            for inport in comp.components.inports:
+                if getattr(inport, '_connection', False):
+                    if isinstance(inport._connection, Connection):
+                        inport._connection.send.event.remove_listener(
+                            self.send_data)
+                elif getattr(inport, '_connections', False):
+                    for connection in inport._connections:
+                        if isinstance(connection, Connection):
+                            connection.send.event.remove_listener(self.send_data)
 
     # FIXME: consider removing this and the next
     # these packet count methods overlap with the creates/sends/receives counts.

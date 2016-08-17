@@ -10,6 +10,7 @@ from rill.engine.exceptions import FlowError
 from rill.engine.types import Stream
 from rill.utils import NOT_SET
 from rill.compat import *
+from rill.utils.observer import supports_listeners
 
 import gevent
 import gevent.event
@@ -596,6 +597,7 @@ class Connection(BaseConnection):
         self.receiver.network.active = True
         return packet
 
+    @supports_listeners
     def send(self, packet, outport):
         """
         See ``OutputPort.send``
@@ -685,6 +687,8 @@ class Connection(BaseConnection):
 
         self.sender.network.sends += 1
         self.outport = None
+
+        self.send.event.emit(self, outport, self.inport, packet)
         return True
 
     def capacity(self):

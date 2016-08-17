@@ -780,6 +780,27 @@ class RuntimeHandler(object):
         status = self.get_network_status(msg.payload['graph'])
         self.send_revision(msg.replace(command=command, payload=status))
 
+    def send_network_data(self, connection, outport, inport, packet):
+        edge_id = '{}.{}{} -> {}.{}{}'.format(
+            outport.component.name, outport.name, '[{}]'.format(outport.index),
+            inport.component.name, inport.name, '[{}]'.format(inport.index))
+
+        msg = Message('network', 'data', {
+            'src': {
+                'node': outport.component.name,
+                'port': outport.name,
+                'index': outport.index
+            },
+            'tgt': {
+                'node': inport.component.name,
+                'port': inport.name,
+                'index': inport.index
+            },
+            'id': edge_id,
+            'graph': inport.component.network.graph.name
+        })
+        self.send_revision(msg)
+
     def handle_network(self, msg):
         """
         Start / Stop and provide status messages about the network.
@@ -860,11 +881,18 @@ class RuntimeServer(object):
         print("Server listening on port %d" % self.port)
         # Run reactor until process interrupted
         try:
+            self.runtime.send_network_data.event.listen(
+                self.handler.send_network_data)
+
             self.loop.start()
+
         except KeyboardInterrupt:
             pass
 
     def stop(self):
+        self.runtime.send_network_data.event.remove_listener(
+            self.handler.send_network_data)
+
         self.loop.stop()
 
     # def publish(self, key, command, payload, id, revision):

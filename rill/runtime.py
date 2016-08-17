@@ -16,6 +16,7 @@ from rill.engine.types import FBP_TYPES, Stream
 from rill.engine.exceptions import FlowError
 from rill.plumbing import Client, RuntimeServer, Message
 from rill.compat import *
+from rill.utils.observer import supports_listeners
 
 from typing import Union, Any, Iterator, Dict
 
@@ -416,6 +417,11 @@ class Runtime(object):
         print("get_status.  started {}, running {}".format(started, running))
         return started, running
 
+    @supports_listeners
+    def send_network_data(self, connection, outport, inport, packet):
+        self.send_network_data.event.emit(connection, outport, inport, packet)
+        return
+
     def start(self, graph_id, done_callback):
         """
         Execute a graph.
@@ -425,6 +431,8 @@ class Runtime(object):
         graph = self.get_graph(graph_id)
 
         network = Network(graph)
+        network.send_data.event.listen(self.send_network_data)
+
         executor = gevent.Greenlet(network.go)
         # FIXME: should we delete the executor from self._executors on finish?
         # this has an impact on the result returned from get_status().  Leaving
@@ -446,7 +454,10 @@ class Runtime(object):
             raise ValueError('Invalid graph: {}'.format(graph_id))
 
         executor, network = self._executors[graph_id]
+
         network.terminate()
+        network.send_data.event.remove_listener(self.send_network_data)
+
         executor.join()
         del self._executors[graph_id]
 

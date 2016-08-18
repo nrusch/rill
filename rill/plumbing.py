@@ -14,7 +14,7 @@ import traceback
 import gevent
 import zmq.green as zmq
 from zmq.green.eventloop.ioloop import IOLoop, PeriodicCallback
-from zmq.green.eventloop.zmqstream import ZMQStream
+import zmq.green.eventloop.zmqstream as zmqstream
 import zmq.utils.jsonapi as json
 from zmq.utils.strtypes import bytes, unicode, asbytes
 
@@ -35,7 +35,7 @@ SNAPSHOT_PORT_OFFSET = 0
 
 
 def is_socket_type(socket, typ):
-    if isinstance(socket, ZMQStream):
+    if isinstance(socket, zmqstream.ZMQStream):
         return socket.socket.type == typ
     else:
         return socket.type == typ
@@ -871,8 +871,8 @@ class RuntimeServer(object):
         self.publisher.bind("tcp://*:%d" % (self.port + 1))
 
         # Wrap sockets in ZMQStreams for IOLoop handlers
-        self.publisher = ZMQStream(self.publisher)  # only necessary for heartbeat
-        self.collector = ZMQStream(self.collector)
+        self.publisher = zmqstream.ZMQStream(self.publisher)  # only necessary for heartbeat
+        self.collector = zmqstream.ZMQStream(self.collector)
 
         # Register handlers with reactor
         self.collector.on_recv(self.handle_message)

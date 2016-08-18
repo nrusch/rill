@@ -1,3 +1,5 @@
+import pytest
+
 import itertools
 import json
 import uuid
@@ -7,11 +9,149 @@ patch()
 
 import gevent
 
-from mock import MagicMock, call
+from mock import MagicMock, patch
+import rill.plumbing as plumbing
 from rill.plumbing import Client, RuntimeServer, Message
 from rill.runtime import Runtime
 
-def test_runtime():
+import zmq.green as zmq
+import zmq.green.eventloop.zmqstream as zmqstream
+
+
+@patch.object(zmq, 'Context')
+@patch.object(zmqstream, 'ZMQStream')
+@patch.object(plumbing, 'is_socket_type', return_value=False)
+def test_runtime_server(Context, ZMQStream, is_socket_type):
+    runtime = Runtime()
+    runtime.register_module('tests.components')
+
+    server = RuntimeServer(runtime, port=6556)
+
+    test_graph = Message(
+        protocol='graph',
+        command='addgraph',
+        payload={
+            'id': 'testgraph',
+            'name': 'testgraph'
+        },
+        id=uuid.uuid1()
+    )
+
+    server.handle_collect(test_graph, '')
+    server.publisher.send_multipart.assert_called()
+
+    result = Message.from_frames(
+        *server.publisher.send_multipart.call_args[0][0])
+
+    assert result.protocol == 'graph'
+    assert result.command == 'addgraph'
+    assert result.payload['id'] == 'testgraph'
+    assert runtime._graphs['testgraph']
+
+    server.publisher.send_multipart.reset_mock()
+    server.collector.send_multipart.reset_mock()
+
+    snapshot_message = Message(
+        'internal', 'startsync', 'testgraph', uuid.uuid1())
+
+    server.handle_snapshot(snapshot_message, '')
+
+    clear_message = Message.from_frames(
+        *server.collector.send_multipart.call_args_list[0][0][0])
+
+    assert clear_message.protocol == 'graph'
+    assert clear_message.command == 'clear'
+    assert clear_message.payload == {
+        'id': 'testgraph',
+        'name': 'testgraph',
+    }
+
+    status_message = Message.from_frames(
+        *server.collector.send_multipart.call_args_list[1][0][0])
+
+    assert status_message.protocol == 'network'
+    assert status_message.command == 'status'
+    assert status_message.payload['graph'] == 'testgraph'
+    assert status_message.payload['running'] == False
+    assert status_message.payload['started'] == False
+
+    server.publisher.send_multipart.reset_mock()
+    server.collector.send_multipart.reset_mock()
+
+    genarray = Message(
+        protocol='graph',
+        command='addnode',
+        payload={
+            'graph': 'testgraph',
+            'id': 'node1',
+            'component': 'tests.components/GenerateArray'
+        },
+        id=uuid.uuid1()
+    )
+
+    server.handle_collect(genarray, '')
+    server.publisher.send_multipart.assert_called()
+    genarray_result = Message.from_frames(
+        *server.publisher.send_multipart.call_args[0][0])
+
+    assert genarray_result.protocol == 'graph'
+    assert genarray_result.command == 'addnode'
+    assert genarray_result.payload == genarray.payload
+
+    server.publisher.send_multipart.reset_mock()
+    server.collector.send_multipart.reset_mock()
+
+    repeat = Message(
+        protocol='graph',
+        command='addnode',
+        payload={
+            'graph': 'testgraph',
+            'id': 'node2',
+            'component': 'tests.components/Repeat'
+        },
+        id=uuid.uuid1()
+    )
+
+    server.handle_collect(repeat, '')
+    server.publisher.send_multipart.assert_called()
+    repeat_result = Message.from_frames(
+        *server.publisher.send_multipart.call_args[0][0])
+
+    assert repeat_result.protocol == 'graph'
+    assert repeat_result.command == 'addnode'
+    assert repeat_result.payload == repeat.payload
+
+    server.publisher.send_multipart.reset_mock()
+    server.collector.send_multipart.reset_mock()
+
+    edge = Message(
+        protocol='graph',
+        command='addedge',
+        payload={
+            'graph': 'testgraph',
+            'src': {
+                'node': 'node1',
+                'port': 'OUT'
+            },
+            'tgt': {
+                'node': 'node2',
+                'port': 'in'
+            }
+        },
+        id=uuid.uuid1()
+    )
+
+    server.handle_collect(edge, '')
+    server.publisher.send_multipart.assert_called()
+    edge_result = Message.from_frames(
+        *server.publisher.send_multipart.call_args[0][0])
+
+    assert edge_result.payload['src'] == edge.payload['src']
+    assert edge_result.payload['tgt'] == edge.payload['tgt']
+
+
+@pytest.mark.skip(reason="integration test")
+def test_runtime_flow():
     runtime = Runtime()
     runtime.register_module('tests.components')
 
@@ -20,8 +160,8 @@ def test_runtime():
     on_response = MagicMock()
     client = Client(on_response)
 
-    gevent.spawn(lambda: server.start())
-    client.connect("tcp://localhost", 5556)
+    gevent.spawn(server.start)
+    client.connect('tcp://localhost', 5556)
 
     gevent.sleep(.01)
     expected = [

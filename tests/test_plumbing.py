@@ -25,7 +25,7 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
     runtime = Runtime()
     runtime.register_module('tests.components')
 
-    server = RuntimeServer(runtime, port=6556)
+    server = RuntimeServer(runtime)
 
     test_graph = Message(
         protocol='graph',
@@ -155,13 +155,13 @@ def test_runtime_flow():
     runtime = Runtime()
     runtime.register_module('tests.components')
 
-    server = RuntimeServer(runtime)
+    server = RuntimeServer(runtime, 4556)
 
     on_response = MagicMock()
     client = Client(on_response)
 
     gevent.spawn(server.start)
-    client.connect('tcp://localhost', 5556)
+    client.connect('tcp://localhost', 4556)
 
     gevent.sleep(.01)
     expected = [

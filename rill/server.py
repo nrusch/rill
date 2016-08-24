@@ -51,7 +51,20 @@ class WebSocketRuntimeApplication(geventwebsocket.WebSocketApplication):
             self.client.send(Message(**json.loads(message)))
 
     def on_response(self, msg):
+        import time
         self.logger.debug("OUTCOMING: %r" % msg)
+        # if msg.command == 'addnode' or msg.command == 'removenode':
+        # if msg.command == 'addedge' or msg.command == 'removeedge':
+        # if msg.command == 'removeedge':
+        # if (msg.command == 'addnode' or msg.command == 'removenode' or
+            # msg.command == 'addedge' or msg.command == 'removeedge'):
+        # if msg.command == 'addinitial' or msg.command == 'removeinitial':
+            # print('PAUSE')
+            # print(msg.to_dict())
+            # time.sleep(5)
+
+        # if not (msg.command == 'removeedge'):
+        # print('SEND')
         self.ws.send(json.dumps(msg.to_dict()))
 
 

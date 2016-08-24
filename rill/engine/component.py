@@ -19,7 +19,33 @@ PORT_NAME_REG = r"^([a-zA-Z][_a-zA-Z0-9]*)(?:\[(\d+)\])?$"
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
+
+
+class ComponentFilter(logging.Filter):
+    def filter(self, record):
+        import gevent
+        thread = gevent.getcurrent()
+
+        if thread and getattr(thread, 'network', None):
+            record.graph = thread.network.graph.name
+
+        return True
+
+_logger.addFilter(ComponentFilter())
+
 logger = LogFormatter(_logger, {})
+
+
+class RuntimeComponentHandler(logging.Handler):
+    lock = False
+    level = _logger.level
+
+    def __init__(self, runtime_handler):
+        self.runtime_handler = runtime_handler
+        return super(logging.Handler, self).__init__()
+
+    def emit(self, record):
+        self.runtime_handler.send_log_record(record)
 
 
 @inport(IN_NULL)

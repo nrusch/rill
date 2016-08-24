@@ -434,6 +434,8 @@ class Runtime(object):
         network.send_data.event.listen(self.send_network_data)
 
         executor = gevent.Greenlet(network.go)
+        executor.network = network
+
         # FIXME: should we delete the executor from self._executors on finish?
         # this has an impact on the result returned from get_status().  Leaving
         # it means that after completion it will be started:True, running:False

@@ -9,6 +9,7 @@ from rill.engine.utils import LogFormatter
 from rill.engine.status import StatusValues
 from rill.engine.exceptions import FlowError, ComponentError
 from rill.engine.port import OUT_NULL, IN_NULL
+from rill.engine.component import logger
 from rill.utils import cache
 
 
@@ -22,7 +23,7 @@ class ComponentRunner(Greenlet):
     behavior of a component subclass, the ``ComponentRunner`` provides the
     private API used by the Network and port classes.
     """
-    logger = LogFormatter(logging.getLogger("component.runner"), {})
+    logger = logger
 
     def __init__(self, component, parent):
         """

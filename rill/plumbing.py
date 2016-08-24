@@ -462,7 +462,10 @@ def client_agent_loop(ctx, pipe, on_recv):
                         # Discard out-of-revision updates, incl. hugz
                         print("msg %r" % msg)
                         assert isinstance(msg.revision, int)
-                        if msg.revision > agent.revision or msg.command == 'error':
+                        if (
+                            msg.revision > agent.revision or
+                            msg.command == 'error' or msg.command == 'log'
+                        ):
                             agent.revision = msg.revision
 
                             on_recv(msg)
@@ -493,6 +496,9 @@ class RuntimeHandler(object):
     Utility class for processing messages into changes to a Runtime
     """
     def __init__(self, runtime, socket, responder):
+        from rill.engine.component import _logger, RuntimeComponentHandler
+        _logger.addHandler(RuntimeComponentHandler(self))
+
         self.runtime = runtime
         # current revision of runtime state. used to ensure sync between
         # snapshot and subsequent publishes
@@ -517,6 +523,18 @@ class RuntimeHandler(object):
         # re-publish to all clients with a revision number
         # print("Re-publishing with key %r" % key)
         msg.sendto(self.socket)
+
+    def send_log_record(self, record):
+        if getattr(record, 'graph', False):
+            Message(
+                protocol='network',
+                command='log',
+                payload={
+                    'graph': record.graph,
+                    'message': record.msg % record.args
+                },
+                revision=self.revision
+            ).sendto(self.socket)
 
     def handle_message(self, msg, identity):
         """

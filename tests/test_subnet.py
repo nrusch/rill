@@ -198,3 +198,33 @@ def test_get_spec():
     assert len(spec['inPorts']) == 2
     assert len(spec['outPorts']) == 2
 
+
+def test_rename_exports():
+    graph = Graph()
+    graph.add_component('Head', Passthru)
+    graph.add_component('Tail', Passthru)
+
+    graph.connect('Head.OUT', 'Tail.IN')
+
+    graph.export('Head.IN', 'IN')
+    graph.export('Tail.OUT', 'OUT')
+
+    graph.set_inport_metadata('IN', {'x': 100})
+    graph.set_outport_metadata('OUT', {'y': 100})
+
+    graph.rename_inport('IN', 'HAPPY')
+    assert graph.inports['HAPPY'] == graph.get_component_port('Head.IN')
+    assert graph.inport_metadata['HAPPY'] == {
+        'x': 100
+    }
+    assert not graph.inports.get('IN', False)
+    assert not graph.inport_metadata.get('IN', False)
+
+    graph.rename_outport('OUT', 'SAD')
+    assert graph.outports['SAD'] == graph.get_component_port('Tail.OUT')
+    assert graph.outport_metadata['SAD'] == {
+        'y': 100
+    }
+    assert not graph.outports.get('OUT', False)
+    assert not graph.outport_metadata.get('OUT', False)
+

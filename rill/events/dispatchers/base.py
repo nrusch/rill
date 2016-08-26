@@ -102,6 +102,12 @@ class GraphDispatcher(object):
         """
 
     @abstractmethod
+    def rename_inport(self, payload):
+        """
+        Rename inport
+        """
+
+    @abstractmethod
     def add_outport(self, payload):
         """
         Add outport to graph
@@ -118,3 +124,10 @@ class GraphDispatcher(object):
         """
         Send the metadata on an exported inport
         """
+
+    @abstractmethod
+    def rename_outport(self, payload):
+        """
+        Rename outport
+        """
+

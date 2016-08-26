@@ -413,6 +413,34 @@ class Graph(object):
         self.set_outport_metadata.event.emit(external_port_name, metadata)
         return port_metadata
 
+    @supports_listeners
+    def rename_inport(self, from_name, to_name):
+        inport = self.rename_export(
+            from_name, to_name, self.inports, self.inport_metadata)
+
+        self.rename_inport.event.emit(from_name, to_name)
+        return inport
+
+    @supports_listeners
+    def rename_outport(self, from_name, to_name):
+        outport =self.rename_export(
+            from_name, to_name, self.outports, self.outport_metadata)
+
+        self.rename_outport.event.emit(from_name, to_name)
+        return outport
+
+    def rename_export(self, from_name, to_name, ports, metadata_map):
+        port = ports[from_name]
+        metadata = metadata_map[from_name]
+
+        ports[to_name] = port
+        metadata_map[to_name] = metadata
+
+        del ports[from_name]
+        del metadata_map[from_name]
+
+        return port
+
     # FIXME: might be better to split this into get_component_inport / get_component_outport
     # the main argument for the current design is if you don't know or care what
     # kind of port you want, but in practice, 'kind' is always provided

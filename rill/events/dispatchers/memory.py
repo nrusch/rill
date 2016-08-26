@@ -155,6 +155,12 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         self._set_inport_metadata(payload['graph'], payload['public'],
                             payload['metadata'])
 
+    def rename_inport(self, payload):
+        """
+        Rename inport
+        """
+        self._rename_inport(payload['graph'], payload['from'], payload['to'])
+
     def add_outport(self, payload):
         """
         Add outport to graph
@@ -175,6 +181,12 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         """
         self._set_outport_metadata(payload['graph'], payload['public'],
                              payload['metadata'])
+
+    def rename_outport(self, payload):
+        """
+        Rename outport
+        """
+        self._rename_outport(payload['graph'], payload['from'], payload['to'])
 
     # -- implementation
 
@@ -373,6 +385,13 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         graph = self.get_graph(graph_id)
         graph.set_inport_metadata(public, metadata)
 
+    def _rename_inport(self, graph_id, from_name, to_name):
+        """
+        Rename inport
+        """
+        graph = self.get_graph(graph_id)
+        graph.rename_inport(from_name, to_name)
+
     def _remove_outport(self, graph_id, public):
         """
         Remove outport from graph
@@ -387,4 +406,10 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         graph = self.get_graph(graph_id)
         graph.set_outport_metadata(public, metadata)
 
+    def _rename_outport(self, graph_id, from_name, to_name):
+        """
+        Rename outport
+        """
+        graph = self.get_graph(graph_id)
+        graph.rename_outport(from_name, to_name)
 

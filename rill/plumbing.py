@@ -734,6 +734,12 @@ class RuntimeHandler(object):
         elif command == 'changeoutport':
             self.runtime.change_outport(
                 get_graph(), payload['public'], payload['metadata'])
+        elif command == 'renameinport':
+            self.runtime.rename_inport(
+                get_graph(), payload['from'], payload['to'])
+        elif command == 'renameoutport':
+            self.runtime.rename_outport(
+                get_graph(), payload['from'], payload['to'])
         # Metadata changes
         elif command == 'changenode':
             self.runtime.set_node_metadata(get_graph(),
@@ -979,7 +985,7 @@ class RuntimeServer(object):
             return
 
         # Now send END message with revision number
-        logging.info("I: Sending state shapshot=%d" % self.handler.revision)
+        logging.info("I: Sending state snapshot=%d" % self.handler.revision)
         Message(b'internal', b'endsync', self.handler.revision).sendto(
             self.collector, identity)
 

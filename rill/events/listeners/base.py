@@ -30,6 +30,8 @@ class GraphListener(object):
         'removeoutport': 'remove_outport',
         'changeinport': 'set_inport_metadata',
         'changeoutport': 'set_outport_metadata',
+        'renameinport': 'rename_inport',
+        'renameoutport': 'rename_outport',
     }
 
     def __init__(self, dispatchers):

@@ -238,6 +238,8 @@ class InMemoryGraphListener(GraphListener):
         self.graph.remove_outport.event.listen(self.remove_outport)
         self.graph.set_inport_metadata.event.listen(self.set_inport_metadata)
         self.graph.set_outport_metadata.event.listen(self.set_outport_metadata)
+        self.graph.rename_inport.event.listen(self.rename_inport)
+        self.graph.rename_outport.event.listen(self.rename_outport)
         self.graph.connect.event.listen(self.connect)
         self.graph.disconnect.event.listen(self.disconnect)
         self.graph.set_node_metadata.event.listen(self.set_node_metadata)
@@ -320,6 +322,13 @@ class InMemoryGraphListener(GraphListener):
             'metadata': metadata
         })
 
+    def rename_inport(self, from_name, to_name):
+        self.handle('renameinport', {
+            'graph': self.graph.name,
+            'from': from_name,
+            'to': to_name
+        })
+
     def remove_outport(self, external_port_name):
         self.handle('removeoutport', {
             'graph': self.graph.name,
@@ -331,6 +340,13 @@ class InMemoryGraphListener(GraphListener):
             'graph': self.graph.name,
             'public': external_port_name,
             'metadata': metadata
+        })
+
+    def rename_outport(self, from_name, to_name):
+        self.handle('renameoutport', {
+            'graph': self.graph.name,
+            'from': from_name,
+            'to': to_name
         })
 
     def connect(self, outport, inport, connection_capacity=None, metadata=None):

@@ -61,7 +61,7 @@ class WebSocketRuntimeApplication(geventwebsocket.WebSocketApplication):
         # if msg.command == 'addinitial' or msg.command == 'removeinitial':
             # print('PAUSE')
             # print(msg.to_dict())
-            # time.sleep(5)
+            # time.sleep(3)
 
         # if not (msg.command == 'removeedge'):
         # print('SEND')

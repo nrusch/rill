@@ -676,6 +676,20 @@ class Runtime(object):
         graph = self.get_graph(graph_id)
         graph.outport_metadata[public] = metadata
 
+    def rename_inport(self, graph_id, from_name, to_name):
+        """
+        Change public port name of inport
+        """
+        graph = self.get_graph(graph_id)
+        graph.rename_inport(from_name, to_name)
+
+    def rename_outport(self, graph_id, from_name, to_name):
+        """
+        Change public port name of outport
+        """
+        graph = self.get_graph(graph_id)
+        graph.rename_outport(from_name, to_name)
+
     def change_graph(self, graph_id, description=None, metadata={}):
         """
         Change graph attributes

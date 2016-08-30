@@ -188,6 +188,47 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         """
         self._rename_outport(payload['graph'], payload['from'], payload['to'])
 
+    def add_group(self, payload):
+        """
+        Add group to graph
+        """
+        self._add_group(
+            payload['graph'],
+            payload['name'],
+            payload['nodes'],
+            payload.get('metadata', None)
+        )
+
+    def remove_group(self, payload):
+        """
+        Remove group from graph
+        """
+        self._remove_group(
+            payload['graph'],
+            payload['name']
+        )
+
+    def rename_group(self, payload):
+        """
+        Rename group
+        """
+        self._remove_group(
+            payload['graph'],
+            payload['from'],
+            payload['to']
+        )
+
+    def change_group(self, payload):
+        """
+        Rename group
+        """
+        self._remove_group(
+            payload['graph'],
+            payload['name'],
+            payload['nodes'],
+            payload.get('metadata', None)
+        )
+
     # -- implementation
 
     def _get_graph(self, graph_id):
@@ -412,4 +453,32 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         """
         graph = self.get_graph(graph_id)
         graph.rename_outport(from_name, to_name)
+
+    def _add_group(self, graph_id, name, nodes, metadata):
+        """
+        Add group to graph
+        """
+        graph = self.get_graph(graph_id)
+        graph.add_group(name, nodes, metadata)
+
+    def _remove_group(self, graph_id, name):
+        """
+        Remove group from graph
+        """
+        graph = self.get_graph(graph_id)
+        graph.remove_group(name)
+
+    def _rename_group(self, graph_id, from_name, to_name):
+        """
+        Remove group from graph
+        """
+        graph = self.get_graph(graph_id)
+        graph.rename_group(from_name, to_name)
+
+    def _change_group(self, graph_id, name, nodes=None, metadata=None):
+        """
+        Change group
+        """
+        graph = self.get_graph(graph_id)
+        graph.change_group(name, nodes, metadata)
 

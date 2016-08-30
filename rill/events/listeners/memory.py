@@ -246,6 +246,10 @@ class InMemoryGraphListener(GraphListener):
         self.graph.set_edge_metadata.event.listen(self.set_edge_metadata)
         self.graph.initialize.event.listen(self.initialize)
         self.graph.uninitialize.event.listen(self.uninitialize)
+        self.graph.add_group.event.listen(self.add_group)
+        self.graph.remove_group.event.listen(self.remove_group)
+        self.graph.rename_group.event.listen(self.rename_group)
+        self.graph.change_group.event.listen(self.change_group)
 
     def remove_listeners(self):
         # TODO
@@ -375,3 +379,33 @@ class InMemoryGraphListener(GraphListener):
             'graph': self.graph.name,
             'tgt': fbp_port(inport)
         })
+
+    def add_group(self, name, nodes, metadata):
+        self.handle('addgroup', {
+            'graph': self.graph.name,
+            'name': name,
+            'nodes': nodes,
+            'metadata': metadata
+        })
+
+    def remove_group(self, name):
+        self.handle('removegroup', {
+            'graph': self.graph.name,
+            'name': name
+        })
+
+    def rename_group(self, from_name, to_name):
+        self.handle('renamegroup', {
+            'graph': self.graph.name,
+            'from': from_name,
+            'to': to_name
+        })
+
+    def change_group(self, name, nodes, metadata):
+        self.handle('changegroup', {
+            'graph': self.graph.name,
+            'name': name,
+            'nodes': nodes,
+            'metadata': metadata
+        })
+

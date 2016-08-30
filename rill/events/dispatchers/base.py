@@ -131,3 +131,27 @@ class GraphDispatcher(object):
         Rename outport
         """
 
+    @abstractmethod
+    def add_graph(self, name, nodes, metadata):
+        """
+        Add group to graph
+        """
+
+    @abstractmethod
+    def remove_graph(self, name):
+        """
+        Remove group from graph
+        """
+
+    @abstractmethod
+    def rename_group(self, name):
+        """
+        Rename group
+        """
+
+    @abstractmethod
+    def change_group(self, name, nodes, metadata):
+        """
+        Change group
+        """
+

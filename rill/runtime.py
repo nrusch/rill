@@ -714,6 +714,33 @@ class Runtime(object):
         del self._graphs[old_id]
         self._graphs[new_id] = graph
 
+    def add_group(self, graph_id, name, nodes, metadata={}):
+        """
+        Add group to graph
+        """
+        graph = self.get_graph(graph_id)
+        return graph.add_group(name, nodes, metadata)
+
+    def remove_group(self, graph_id, name):
+        """
+        Remove group from graph
+        """
+        graph = self.get_graph(graph_id)
+        return graph.remove_group(name)
+
+    def rename_group(self, graph_id, from_name, to_name):
+        """
+        Rename group
+        """
+        graph = self.get_graph(graph_id)
+        return graph.rename_group(name, from_name, to_name)
+
+    def change_group(self, graph_id, name, nodes=None, metadata=None):
+        """
+        Change group
+        """
+        graph = self.get_graph(graph_id)
+        return graph.change_group(name, nodes, metadata)
 
 # FIXME: do we need the host?
 def serve_runtime(runtime=None, host=DEFAULTS['host'], port=DEFAULTS['port'],

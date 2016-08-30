@@ -59,6 +59,8 @@ class Graph(object):
         self.outports = OrderedDict()
         self.outport_metadata = OrderedDict()
 
+        self.groups = OrderedDict()
+
     def __repr__(self):
         return '{}(name={!r})'.format(self.__class__.__name__, self.name)
 
@@ -440,6 +442,46 @@ class Graph(object):
         del metadata_map[from_name]
 
         return port
+
+    @supports_listeners
+    def add_group(self, name, nodes, metadata):
+        """
+        Add group to graph
+        """
+        self.groups[name] = {
+            'nodes': nodes,
+            'metadata': metadata
+        }
+        self.add_group.event.emit(name, nodes, metadata)
+
+    @supports_listeners
+    def remove_group(self, name):
+        """
+        Remove group from graph
+        """
+        del self.groups[name]
+        self.remove_group.event.emit(name)
+
+    @supports_listeners
+    def rename_group(self, from_name, to_name):
+        """
+        Rename group
+        """
+        group = self.groups[from_name]
+        self.rename_group.event.emit(from_name, to_name)
+
+    @supports_listeners
+    def change_group(self, name, nodes=None, metadata=None):
+        """
+        Change group
+        """
+        group = self.groups[from_name]
+        if nodes:
+            group['nodes'] = nodes
+        if metadata:
+            merge_metadata(metadata, group['metadata'])
+
+        self.change_group.event.emit(name, nodes, metadata)
 
     # FIXME: might be better to split this into get_component_inport / get_component_outport
     # the main argument for the current design is if you don't know or care what

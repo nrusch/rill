@@ -32,6 +32,11 @@ class GraphListener(object):
         'changeoutport': 'set_outport_metadata',
         'renameinport': 'rename_inport',
         'renameoutport': 'rename_outport',
+        # Groups
+        'addgroup': 'add_group',
+        'removegroup': 'remove_group',
+        'renamegroup': 'rename_group',
+        'changegroup': 'change_group',
     }
 
     def __init__(self, dispatchers):

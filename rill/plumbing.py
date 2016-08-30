@@ -750,6 +750,31 @@ class RuntimeHandler(object):
                                            payload['src'],
                                            payload['tgt'],
                                            payload['metadata'])
+        elif command == 'addgroup':
+            self.runtime.add_group(
+                get_graph(),
+                payload['name'],
+                payload['nodes'],
+                payload.get('metadata', {})
+            )
+        elif command == 'removegroup':
+            self.runtime.remove_group(
+                get_graph(),
+                payload['name']
+            )
+        elif command == 'renamegroup':
+            self.runtime.rename_group(
+                get_graph(),
+                payload['from'],
+                payload['to']
+            )
+        elif command == 'changegroup':
+            self.runtime.change_group(
+                get_graph(),
+                payload['name'],
+                payload['nodes'],
+                payload.get('metadata', {})
+            )
 
         # elif command == 'getgraph':
         #     send_ack = False

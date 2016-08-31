@@ -467,7 +467,14 @@ class Graph(object):
         """
         Rename group
         """
-        group = self.groups[from_name]
+        try:
+            group = self.groups[from_name]
+        except KeyError:
+            raise FlowError('group {} not found'.format(from_name))
+
+        self.groups[to_name] = group
+        del self.groups[from_name]
+
         self.rename_group.event.emit(from_name, to_name)
 
     @supports_listeners
@@ -475,7 +482,11 @@ class Graph(object):
         """
         Change group
         """
-        group = self.groups[from_name]
+        try:
+            group = self.groups[name]
+        except KeyError:
+            raise FlowError('group {} not found'.format(name))
+
         if nodes:
             group['nodes'] = nodes
         if metadata:

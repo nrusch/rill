@@ -733,7 +733,7 @@ class Runtime(object):
         Rename group
         """
         graph = self.get_graph(graph_id)
-        return graph.rename_group(name, from_name, to_name)
+        return graph.rename_group(from_name, to_name)
 
     def change_group(self, graph_id, name, nodes=None, metadata=None):
         """

@@ -205,6 +205,14 @@ def get_graph_messages(graph, graph_id):
             'metadata': graph.outport_metadata.get(public_port, {})
         })
 
+    for name, group in graph.groups.items():
+        yield ('addgroup', {
+            'graph': graph_id,
+            'name': name,
+            'nodes': group['nodes'],
+            'metadata': group['metadata']
+        })
+
 
 class InMemoryNetworkListner():
     pass

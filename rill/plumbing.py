@@ -772,7 +772,7 @@ class RuntimeHandler(object):
             self.runtime.change_group(
                 get_graph(),
                 payload['name'],
-                payload['nodes'],
+                payload.get('nodes', None),
                 payload.get('metadata', {})
             )
 

@@ -517,6 +517,7 @@ class Runtime(object):
         graph : ``rill.engine.network.Graph``
         """
         self._graphs[graph_id] = graph
+        self.register_subnet(graph_id)
 
     def add_node(self, graph_id, node_id, component_id, metadata):
         """
@@ -647,6 +648,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.export("{}.{}".format(node, port), public, metadata)
+        self.register_subnet(graph_id)
 
     def remove_inport(self, graph_id, public):
         """
@@ -654,6 +656,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.remove_inport(public)
+        self.register_subnet(graph_id)
 
     def remove_outport(self, graph_id, public):
         """
@@ -661,6 +664,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.remove_outport(public)
+        self.register_subnet(graph_id)
 
     def change_inport(self, graph_id, public, metadata):
         """
@@ -682,6 +686,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.rename_inport(from_name, to_name)
+        self.register_subnet(graph_id)
 
     def rename_outport(self, graph_id, from_name, to_name):
         """
@@ -689,6 +694,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.rename_outport(from_name, to_name)
+        self.register_subnet(graph_id)
 
     def change_graph(self, graph_id, description=None, metadata={}):
         """

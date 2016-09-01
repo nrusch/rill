@@ -391,4 +391,4 @@ def make_subgraph(name, graph):
         'subgraph': graph,
         'define': classmethod(define)
     }
-    return type(name, (SubGraph,), attrs)
+    return type(bytes(name), (SubGraph,), attrs)

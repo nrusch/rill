@@ -187,7 +187,7 @@ class Message(object):
         """
         # For PUB sockets we add the graph id to the first frame for
         # subscriptions to match against
-        if is_socket_type(socket, zmq.PUB):
+        if is_socket_type(socket, zmq.PUB) and (self.protocol in ['network', 'graph']):
             if self.graph_id is None:
                 if 'graph' in self.payload:
                     self.graph_id = self.payload['graph']
@@ -461,10 +461,11 @@ def client_agent_loop(ctx, pipe, on_recv):
                         # Receive message published from server.
                         # Discard out-of-revision updates, incl. hugz
                         print("msg %r" % msg)
-                        assert isinstance(msg.revision, int)
                         if (
                             msg.revision > agent.revision or
-                            msg.command == 'error' or msg.command == 'log'
+                            msg.command == 'error' or
+                            msg.command == 'log' or
+                            msg.protocol == 'component'
                         ):
                             agent.revision = msg.revision
 
@@ -666,7 +667,11 @@ class RuntimeHandler(object):
 
         def get_graph():
             try:
-                return payload['graph']
+                if command in ['clear', 'addgraph']:
+                    return payload['id']
+                else:
+                    return payload['graph']
+
             except KeyError:
                 raise FlowError('No graph specified')
 
@@ -679,6 +684,7 @@ class RuntimeHandler(object):
         #     )
 
         # New graph
+        send_component = False
         if command == 'clear':
             self.runtime.new_graph(
                 payload['id'],
@@ -686,6 +692,7 @@ class RuntimeHandler(object):
                 payload.get('metadata', None)
             )
         if command == 'addgraph':
+            send_component = True
             self.runtime.new_graph(
                 payload['id'],
                 payload.get('description', None),
@@ -719,13 +726,16 @@ class RuntimeHandler(object):
                                                  payload['tgt'])
         # Exported ports
         elif command in ('addinport', 'addoutport'):
+            send_component = True
             self.runtime.add_export(get_graph(), payload['node'],
                                     payload['port'], payload['public'], payload['metadata'])
             # update_subnet(get_graph())
         elif command == 'removeinport':
+            send_component = True
             self.runtime.remove_inport(get_graph(), payload['public'])
             # update_subnet(get_graph())
         elif command == 'removeoutport':
+            send_component = True
             self.runtime.remove_outport(get_graph(), payload['public'])
             # update_subnet(get_graph())
         elif command == 'changeinport':
@@ -735,9 +745,11 @@ class RuntimeHandler(object):
             self.runtime.change_outport(
                 get_graph(), payload['public'], payload['metadata'])
         elif command == 'renameinport':
+            send_component = True
             self.runtime.rename_inport(
                 get_graph(), payload['from'], payload['to'])
         elif command == 'renameoutport':
+            send_component = True
             self.runtime.rename_outport(
                 get_graph(), payload['from'], payload['to'])
         # Metadata changes
@@ -814,6 +826,15 @@ class RuntimeHandler(object):
             return
 
         self.send_revision(msg)
+        if send_component:
+            message = Message(
+                protocol='component',
+                command='component',
+                payload=self.runtime._component_types[
+                    'abc/{}'.format(get_graph())]['spec'],
+                revision = self.revision
+            )
+            message.sendto(self.socket)
 
     def get_network_status(self, graph_id):
         started, running = self.runtime.get_status(graph_id)

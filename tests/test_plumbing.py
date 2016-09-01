@@ -41,12 +41,18 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
     server.publisher.send_multipart.assert_called()
 
     result = Message.from_frames(
-        *server.publisher.send_multipart.call_args[0][0])
+        *server.publisher.send_multipart.call_args_list[0][0][0])
 
     assert result.protocol == 'graph'
     assert result.command == 'addgraph'
     assert result.payload['id'] == 'testgraph'
     assert runtime._graphs['testgraph']
+
+    component_result = Message.from_frames(
+        *server.publisher.send_multipart.call_args_list[1][0][0])
+
+    assert component_result.protocol == 'component'
+    assert component_result.command == 'component'
 
     server.publisher.send_multipart.reset_mock()
     server.collector.send_multipart.reset_mock()
@@ -196,8 +202,20 @@ def test_runtime_flow():
         'id': uuid.uuid1()
     }
 
+    on_response.reset_mock()
+
     client.send(Message(**test_graph))
     gevent.sleep(.01)
+
+    add_graph_result = on_response.call_args_list[0][0][0].to_dict()
+    assert add_graph_result['protocol'] == test_graph['protocol']
+    assert add_graph_result['command'] == test_graph['command']
+    assert add_graph_result['payload'] == test_graph['payload']
+
+    component_result = on_response.call_args_list[1][0][0].to_dict()
+    assert component_result['protocol'] == 'component'
+    assert component_result['command'] == 'component'
+
     on_response.reset_mock()
 
     watch_graph = {
@@ -306,6 +324,32 @@ def test_runtime_flow():
 
     error_message = on_response.call_args[0][0].to_dict()
     assert error_message['command'] == 'error'
+    on_response.reset_mock()
+
+    add_inport = {
+        'protocol': 'graph',
+        'command': 'addinport',
+        'payload': {
+            'graph': 'testgraph',
+            'node': 'node1',
+            'port': 'COUNT',
+            'public': 'IN',
+            'metadata': {}
+        },
+        'id': uuid.uuid1()
+    }
+
+    client.send(Message(**add_inport))
+    gevent.sleep(.01)
+
+    inport_response = on_response.call_args_list[0][0][0]
+    assert inport_response.protocol == 'graph'
+    assert inport_response.command == 'addinport'
+
+    component_response = on_response.call_args_list[1][0][0]
+    assert component_response.protocol == 'component'
+    assert component_response.command == 'component'
+    assert len(component_response.payload['inPorts']) == 2
 
     client.disconnect()
     server.stop()

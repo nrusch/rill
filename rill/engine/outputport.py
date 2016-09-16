@@ -6,6 +6,7 @@ from rill.engine.port import (Port, ArrayPort, BasePortCollection,
                               PortInterface, OUT_NULL)
 from rill.engine.packet import Packet
 from rill.compat import *
+from rill.utils.observer import supports_listeners
 
 
 @add_metaclass(ABCMeta)
@@ -39,12 +40,18 @@ class OutputPort(Port, OutputInterface):
         self._sender_count = 0
         # type: List[rill.engine.inputport.Connection]
         self._connections = []
+        self.open.event.listen(component.port_opened)
+        self.close.event.listen(component.port_closed)
 
+    @supports_listeners
     def open(self):
         for connection in self._connections:
             connection._sender_count += 1
         self._sender_count = len(self._connections)
 
+        self.open.event.emit(self)
+
+    @supports_listeners
     def close(self):
         """
         Close this OutputPort.
@@ -63,6 +70,8 @@ class OutputPort(Port, OutputInterface):
                     connection.indicate_sender_closed()
             # -- end
         self.sender.logger.debug("Close finished", port=self)
+
+        self.close.event.emit(self)
 
     def is_closed(self):
         """

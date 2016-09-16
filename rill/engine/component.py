@@ -13,6 +13,7 @@ from rill.engine.utils import LogFormatter
 from rill.utils import cache, classproperty
 from rill.decorators import inport, outport
 from rill.compat import *
+from rill.utils.observer import supports_listeners
 
 
 PORT_NAME_REG = r"^([a-zA-Z][_a-zA-Z0-9]*)(?:\[(\d+)\])?$"
@@ -540,6 +541,14 @@ class Component(object):
         """
         # FIXME: lock here?
         return self.network.globals.get(key)
+
+    @supports_listeners
+    def port_opened(self, port):
+        self.port_opened.event.emit(self, port)
+
+    @supports_listeners
+    def port_closed(self, port):
+        self.port_closed.event.emit(self, port)
 
 
 class _FunctionComponent(Component):

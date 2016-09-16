@@ -145,15 +145,24 @@ class InputPort(Port, InputInterface):
         # type: BaseConnection
         self._connection = None
 
+        self.open.event.listen(component.port_opened)
+        self.close.event.listen(component.port_closed)
+
+    @supports_listeners
     def open(self):
         if not self.is_connected() and self.default is not NOT_SET:
             self.initialize(self.default)
         if self.is_connected():
             self._connection.open()
 
+        self.open.event.emit(self)
+
+    @supports_listeners
     def close(self):
         if self.is_connected():
             self._connection.close()
+
+        self.close.event.emit(self)
 
     def is_closed(self):
         if self.is_connected():

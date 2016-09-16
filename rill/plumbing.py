@@ -510,6 +510,9 @@ class RuntimeHandler(object):
         self.logger = logging.getLogger('{}.{}'.format(
             self.__class__.__module__, self.__class__.__name__))
 
+        self.runtime.port_opened.event.listen(self.send_port_opened)
+        self.runtime.port_closed.event.listen(self.send_port_closed)
+
     def send_revision(self, msg):
         """
         Increment the revision, add it to the message, and send it on
@@ -870,6 +873,26 @@ class RuntimeHandler(object):
             },
             'id': edge_id,
             'graph': inport.component.network.graph.name
+        })
+        self.send_revision(msg)
+
+    def send_port_opened(self, graph, component, port):
+        msg = Message('network', 'portopen', {
+            'graph': graph.name,
+            'node': component.name,
+            'port': port.name,
+            'index': port.index,
+            'type': 'inport' if port.kind == 'in' else 'outport'
+        })
+        self.send_revision(msg)
+
+    def send_port_closed(self, graph, component, port):
+        msg = Message('network', 'portclosed', {
+            'graph': graph.name,
+            'node': component.name,
+            'port': port.name,
+            'index': port.index,
+            'type': 'inport' if port.kind == 'in' else 'outport'
         })
         self.send_revision(msg)
 

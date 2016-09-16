@@ -198,6 +198,9 @@ class Graph(object):
                 self.connect(value, receiver)
             else:
                 self.initialize(value, receiver)
+
+        comp.port_opened.event.listen(self.port_opened)
+        comp.port_closed.event.listen(self.port_closed)
         return comp
 
     @supports_listeners
@@ -252,8 +255,20 @@ class Graph(object):
         for outport in component.outports:
             if outport.is_connected():
                 self.disconnect(outport._connection.inport, outport)
+
+        component.port_opened.event.remove_listener(self.port_opened)
+        component.port_closed.event.remove_listener(self.port_closed)
+
         # FIXME: remove references in self.inports and self.outports
         self.remove_component.event.emit(component)
+
+    @supports_listeners
+    def port_opened(self, component, port):
+        self.port_opened.event.emit(self, component, port)
+
+    @supports_listeners
+    def port_closed(self, component, port):
+        self.port_closed.event.emit(self, component, port)
 
     @supports_listeners
     def rename_component(self, orig_name, new_name):

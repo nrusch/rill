@@ -46,7 +46,7 @@ class PortInterface(object):
     """
     kind = None
 
-    @abstractmethod
+    # @abstractmethod
     def close(self):
         """
         Close the port.
@@ -140,7 +140,7 @@ class BasePort(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    # @abstractmethod
     def open(self):
         """
         Open the port.

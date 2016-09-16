@@ -418,6 +418,14 @@ class Runtime(object):
         return started, running
 
     @supports_listeners
+    def port_opened(self, graph, component, port):
+        self.port_opened.event.emit(graph, component, port)
+
+    @supports_listeners
+    def port_closed(self, graph, component, port):
+        self.port_closed.event.emit(graph, component, port)
+
+    @supports_listeners
     def send_network_data(self, connection, outport, inport, packet):
         self.send_network_data.event.emit(connection, outport, inport, packet)
         return
@@ -517,6 +525,10 @@ class Runtime(object):
         graph : ``rill.engine.network.Graph``
         """
         self._graphs[graph_id] = graph
+
+        graph.port_opened.event.listen(self.port_opened)
+        graph.port_closed.event.listen(self.port_closed)
+
         self.register_subnet(graph_id)
 
     def add_node(self, graph_id, node_id, component_id, metadata):

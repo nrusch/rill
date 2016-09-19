@@ -1044,8 +1044,11 @@ class RuntimeServer(object):
                 # FIXME: move this under 'runtime' protocol?
                 # FIXME: notify subscribers about new graphs in handle_collect
                 for graph_id in self.runtime._graphs.keys():
-                    Message(b'graph', b'graph', {'id': graph_id}).sendto(
-                        self.collector, identity)
+                    graph = self.runtime.get_graph(graph_id)
+                    Message(b'graph', b'graph', {
+                        'id': graph_id,
+                        'metadata': graph.metadata
+                    }).sendto(self.collector, identity)
 
         else:
             print("E: bad request, aborting")

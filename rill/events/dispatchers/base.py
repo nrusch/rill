@@ -132,13 +132,13 @@ class GraphDispatcher(object):
         """
 
     @abstractmethod
-    def add_graph(self, name, nodes, metadata):
+    def add_group(self, name, nodes, metadata):
         """
         Add group to graph
         """
 
     @abstractmethod
-    def remove_graph(self, name):
+    def remove_group(self, name):
         """
         Remove group from graph
         """

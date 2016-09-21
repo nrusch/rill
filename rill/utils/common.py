@@ -8,7 +8,10 @@ def importable_class_name(klass, assert_valid=False):
     str
     '''
     import pydoc
-    name = "{}.{}".format(klass.__module__, klass.__name__)
+    if klass.__module__ == '__builtin__':
+        name = klass.__name__
+    else:
+        name = "{}.{}".format(klass.__module__, klass.__name__)
     if assert_valid:
         obj = pydoc.locate(name)
         if obj is None:

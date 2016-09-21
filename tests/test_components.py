@@ -167,12 +167,13 @@ def test_component_with_inheritance():
 
 
 def test_component_spec():
-    assert GenerateTestData.get_spec() == {
+    expected = {
         'name': 'tests.components/GenerateTestData',
         'description': '"Generates stream of packets under control of a counter',
         'inPorts': [
             {
                 'addressable': False,
+                'static': False,
                 'description': '',
                 'id': 'wait',
                 'required': False,
@@ -180,6 +181,7 @@ def test_component_spec():
             },
             {
                 'addressable': False,
+                'static': False,
                 'default': 1,
                 'description': 'Count of packets to be generated',
                 'id': 'COUNT',
@@ -205,6 +207,8 @@ def test_component_spec():
         ],
         'subgraph': False
     }
+    results = GenerateTestData.get_spec()
+    assert results == expected
 
 
 @pytest.mark.xfail(is_patched, reason='order is ACB instead of ABC')

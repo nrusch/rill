@@ -57,6 +57,12 @@ class TestGraphDispatcher(GraphDispatcher):
     add_outport = MagicMock()
     remove_outport = MagicMock()
     set_outport_metadata = MagicMock()
+    add_group = MagicMock()
+    change_group = MagicMock()
+    remove_group = MagicMock()
+    rename_group = MagicMock()
+    rename_inport = MagicMock()
+    rename_outport = MagicMock()
 
 
 def test_memory_graph_dispatcher():

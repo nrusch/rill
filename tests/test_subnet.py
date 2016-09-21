@@ -165,7 +165,7 @@ def test_make_subgraph():
     sub.export('Head.IN', 'IN')
     sub.export('Tail.OUT', 'OUT')
 
-    PassNet = make_subgraph('PassNet', sub)
+    PassNet = make_subgraph(sub, name='PassNet')
 
     assert len(PassNet.inport_definitions) == 2
     assert len(PassNet.outport_definitions) == 2
@@ -191,7 +191,7 @@ def test_get_spec():
     sub.export('Head.IN', 'IN')
     sub.export('Tail.OUT', 'OUT')
 
-    PassNet = make_subgraph('PassNet', sub)
+    PassNet = make_subgraph(sub, name='PassNet')
     spec = PassNet.get_spec()
 
     assert spec['name'] == 'abc/PassNet'

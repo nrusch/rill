@@ -8,15 +8,21 @@ def test_schematics_port():
     spec = PassthruPerson.get_spec()
     inports = spec['inPorts']
 
+    print;print
+    print inports
+    print;print
+
     assert {
         'required': False,
         'addressable': False,
+        'static': False,
         'type': 'bang',
         'id': 'wait',
         'description': ''
     } in inports
     assert {
         'required': False,
+        'static': False,
         'schema': {
             'required': ['name'],
             'type': 'object',
@@ -36,7 +42,7 @@ def test_schematics_port():
                     'type': 'string',
                     'maxLength': 8,
                     'minLength': 8,
-                    'pattern': re.compile(r'\d{3}-\d{4}')
+                    'pattern': r'\d{3}-\d{4}'
                 })
             ]),
             'title': 'Person'
@@ -55,27 +61,31 @@ def test_to_jsonschema():
                 'required': ['name'],
                 'type': 'object',
                 'properties': OrderedDict([
-                    ('name', {'type': 'string'}),
+                    ('name', {
+                        'type': 'string',
+                    }),
                     ('age', {
-                        'default': 0,
                         'type': 'int',
+                        'default': 0,
                         'minimum': 0,
-                        'maximum': 200
+                        'maximum': 200,
                     }),
                     ('favorite_color', {
+                        'type': 'string',
                         'enum': ['cyan', 'magenta', 'chartreuse'],
-                        'type': 'string'
                     }),
                     ('phone_number', {
                         'type': 'string',
-                        'maxLength': 8,
+                        'pattern': r'\d{3}-\d{4}',
                         'minLength': 8,
-                        'pattern': re.compile(r'\d{3}-\d{4}')
+                        'maxLength': 8
                     })
                 ]),
                 'title': 'Person'
             }),
-            ('address', {'type': 'string'}),
+            ('address', {
+                'type': 'string',
+            }),
             ('employees', {
                 'type': 'array',
                 'title': 'Person Array',
@@ -83,22 +93,24 @@ def test_to_jsonschema():
                     'required': ['name'],
                     'type': 'object',
                     'properties': OrderedDict([
-                        ('name', {'type': 'string'}),
+                        ('name', {
+                            'type': 'string',
+                        }),
                         ('age', {
-                            'default': 0,
                             'type': 'int',
+                            'default': 0,
                             'minimum': 0,
-                            'maximum': 200
+                            'maximum': 200,
                         }),
                         ('favorite_color', {
+                            'type': 'string',
                             'enum': ['cyan', 'magenta', 'chartreuse'],
-                            'type': 'string'
                         }),
                         ('phone_number', {
                             'type': 'string',
+                            'pattern': r'\d{3}-\d{4}',
                             'maxLength': 8,
                             'minLength': 8,
-                            'pattern': re.compile(r'\d{3}-\d{4}')
                         })
                     ]),
                     'title': 'Person'

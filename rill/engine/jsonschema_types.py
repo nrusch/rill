@@ -75,6 +75,14 @@ def _convert_field(field_instance):
         schema = {
             "type": TYPE_MAP[getattr(field_instance, 'primitive_type', str)]
         }
+        # add native type into schema
+        native_type = getattr(field_instance, 'native_type')
+        if native_type:
+            if not isinstance(native_type, basestring):
+                from rill.utils import importable_class_name
+                native_type = importable_class_name(native_type)
+            schema.update({"native_type": native_type})
+
         # TODO: date-time, email, ipv4, ipv6
         for js_key, schematic_key in schema_kwargs_to_schematics.items():
             value = getattr(field_instance, schematic_key, None)

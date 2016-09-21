@@ -389,12 +389,13 @@ def serialize(obj):
         obj_type = type(obj)
         handler = get_type_handler(obj_type)
         value = handler.to_primitive(obj)
-        if obj_type in TYPE_MAP:
-            return value
-
-        location = importable_class_name(type(obj))
-        # FIXME: store the schema separately?
-        return {'__type__': location, 'value': value}
+        return value
+        # if obj_type in TYPE_MAP:
+        #     return value
+        #
+        # location = importable_class_name(obj_type)
+        # # FIXME: store the schema separately?
+        # return {'__type__': location, 'value': value}
 
 
 def deserialize(data):

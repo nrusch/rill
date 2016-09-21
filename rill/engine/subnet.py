@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 
 from typing import Type
 
@@ -370,25 +370,38 @@ class SubGraph(Component):
 #         self.outport = self.open_output("OUT")
 
 
-def make_subgraph(name, graph):
+def make_subgraph(graph, bases=None, name=None):
     """
     Make a ``SubGraph`` component class from a ``Graph`` instance.
 
     Parameters
     ----------
-    name : str
     graph : ``rill.engine.network.Graph``
+    bases : ``SubGraph`` | Iterable[``SubGraph``]
+        Base classes to be used when constructing a SubGraph class.
+    name : str | None
+        If None, `graph.name` will be used. If that is also None, a ValueError
+        exception will be raised.
 
     Returns
     -------
     Type[``SubGraph``]
     """
+    if name is None and graph.name is None:
+        raise ValueError('Must provide a name or the graph must have a name.')
+    name = name or graph.name
+
     def define(cls, _):
         cls.subgraph = graph
 
+    if bases is None:
+        bases = [SubGraph]
+    if not isinstance(bases, Iterable):
+        bases = [bases]
+
     attrs = {
-        'name': name,
+        'name': name or graph.name,
         'subgraph': graph,
         'define': classmethod(define)
     }
-    return type(bytes(name), (SubGraph,), attrs)
+    return type(bytes(name), tuple(bases), attrs)

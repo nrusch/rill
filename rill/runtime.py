@@ -317,7 +317,7 @@ class Runtime(object):
 
     def get_subnet_component(self, graph_id):
         graph = self.get_graph(graph_id)
-        Sub = make_subgraph(str(graph_id), graph)
+        Sub = make_subgraph(graph, name=str(graph_id))
         return Sub
 
     def register_subnet(self, graph_id):

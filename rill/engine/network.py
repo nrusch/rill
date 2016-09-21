@@ -217,23 +217,27 @@ class Graph(object):
         self.set_node_metadata.event.emit(node, metadata)
         return node.metadata
 
-    def add_graph(self, name, graph, **initializations):
+    def add_graph(self, graph, name=None, **initializations):
         """
         Instantiate a component and add it to the network.
 
         Parameters
         ----------
-        name : str
-            name of component within the graph
         graph : ``Graph``
             graph to add
+        name : str | None
+            name of component within the graph
 
         Returns
         -------
         ``rill.engine.component.Component``
         """
         from rill.engine.subnet import make_subgraph
-        comp_type = make_subgraph(name, graph)
+        if name is None and graph.name is None:
+            raise ValueError(
+                'Must provide a name or the graph must have a name.')
+        name = name or graph.name
+        comp_type = make_subgraph(graph, name=name)
         return self.add_component(name, comp_type, **initializations)
 
     @supports_listeners
@@ -1237,7 +1241,7 @@ def run_graph(graph, initializations=None, capture_results=False):
         # inports and outports, it might be best to operate on the graph as a
         # SubGraph to ensure consistent behavior
         wrapper = Graph()
-        apply = wrapper.add_graph('Apply', graph)
+        apply = wrapper.add_graph(graph, name='Apply')
 
         for (port_name, content) in initializations.items():
             wrapper.initialize(content, apply.port(port_name))

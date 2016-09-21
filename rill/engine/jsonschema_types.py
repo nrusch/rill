@@ -72,16 +72,17 @@ def _convert_field(field_instance):
         # TODO: max_size -> maxItems
 
     elif isinstance(field_instance, schematics.types.BaseType):
-        schema = {
-            "type": TYPE_MAP[getattr(field_instance, 'primitive_type', str)]
-        }
+        primitive_type = TYPE_MAP[getattr(field_instance, 'primitive_type', str)]
+        schema = {'type': primitive_type}
         # add native type into schema
         native_type = getattr(field_instance, 'native_type')
-        if native_type:
+        if native_type is not None:
             if not isinstance(native_type, basestring):
                 from rill.utils import importable_class_name
-                native_type = importable_class_name(native_type)
-            schema.update({"native_type": native_type})
+                native_type = TYPE_MAP.get(
+                    native_type, importable_class_name(native_type))
+            if native_type != primitive_type:
+                schema.update({"native_type": native_type})
 
         # TODO: date-time, email, ipv4, ipv6
         for js_key, schematic_key in schema_kwargs_to_schematics.items():

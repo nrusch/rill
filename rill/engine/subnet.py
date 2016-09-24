@@ -24,9 +24,14 @@ def merge_portdefs(exported, inherited):
     # @inport can be customized to describe the port's purposed within the
     # SubGraph as a whole, whereas the description of exported port concerns
     # only the behavior of its component.
-    # FIXME: check compatibility of things like array, required...
-    exported.update(inherited)
-    return exported
+    results = inherited.copy()
+    for k, v in exported.items():
+        if k not in results:
+            results[k] = v
+        else:
+            # FIXME: check compatibility of things like array, required...
+            pass
+    return results
 
 
 # using a component to proxy each exported port has a few side effects:

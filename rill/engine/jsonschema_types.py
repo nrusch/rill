@@ -3,6 +3,8 @@ import collections
 import schematics.types
 import schematics.models
 from schematics.undefined import Undefined
+from rill.compat import *
+
 
 def setup_primitive_types():
     import decimal
@@ -72,7 +74,9 @@ def _convert_field(field_instance):
         # TODO: max_size -> maxItems
 
     elif isinstance(field_instance, schematics.types.BaseType):
-        primitive_type = TYPE_MAP[getattr(field_instance, 'primitive_type', str)]
+        # get the primitive_type (use str as default if not defined)
+        primitive_type = TYPE_MAP[
+            getattr(field_instance, 'primitive_type', str) or str]
         schema = {'type': primitive_type}
         # add native type into schema
         native_type = getattr(field_instance, 'native_type')
@@ -100,7 +104,7 @@ def _convert_field(field_instance):
 
     default = field_instance.default
     if default is not Undefined:
-        schema['default'] = default
+        schema['default'] = field_instance.to_primitive(default)
 
     metadata = field_instance.metadata
     if metadata:

@@ -3,6 +3,7 @@ from rill import *
 from rill.fn import range
 from schematics.models import Model
 from schematics.types import StringType, IntType, ModelType, ListType
+from schematics.types import BooleanType
 
 from random import random
 
@@ -187,6 +188,7 @@ class Person(Model):
         'magenta',
         'chartreuse'
     ])
+    married = BooleanType()
     phone_number = StringType(
         regex=re.compile(r'\d{3}-\d{4}'),
         max_length=8,
@@ -242,4 +244,24 @@ def GenerateRandom(COUNT, OUT):
 
     for i in range(count):
         OUT.send(random())
+
+
+@component()
+@inport("BOOL", type=bool, static=True)
+@inport("BOOL_STREAM", type=bool)
+@inport("STR", type=str)
+@inport("CHOICE", type=StringType(choices=[
+    'cyan',
+    'magenta',
+    'chartreuse'
+]), static=True)
+@inport("CHOICE_STREAM", type=StringType(choices=[
+    'cyan',
+    'magenta',
+    'chartreuse'
+]))
+@outport("OUT", type=str)
+def TestFields(BOOL, STR, CHOICES):
+    """Test boolean fields"""
+    return
 

@@ -648,7 +648,7 @@ class Graph(object):
 
     # FIXME: reverse the order of these args
     @supports_listeners
-    def initialize(self, content, receiver, force=False):
+    def initialize(self, content, receiver):
         """
         Initialize an inport port with a value
 
@@ -659,7 +659,7 @@ class Graph(object):
         force : bool
         """
         inport = self.get_component_port(receiver, kind='in')
-        inport.initialize(content, force=force)
+        inport.initialize(content)
         self.initialize.event.emit(inport, content)
 
     @supports_listeners
@@ -832,7 +832,7 @@ class Graph(object):
                 if not tgt.auto_receive:
                     content = Stream(content)
                 # content = tgt.type.to_native(content)
-                graph.initialize(content, tgt, force=True)
+                graph.initialize(content, tgt)
             else:
                 # connection
                 src = _port(connection['src'], 'out')

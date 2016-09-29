@@ -186,15 +186,13 @@ class InputPort(Port, InputInterface):
             if p is not None:
                 return p
 
-    def initialize(self, static_value, force=False):
+    def initialize(self, static_value):
         """
         Initialize a port to a static value.
 
         Parameters
         ----------
         static_value : Any
-        force : bool
-            Allow overriding if port is alraedy initialized
         """
         if self.is_null():
             raise FlowError(
@@ -204,9 +202,9 @@ class InputPort(Port, InputInterface):
                 raise FlowError(
                     "Port cannot have both an initial packet and a "
                     "connection: {}".format(self))
-            elif not force:
-                raise FlowError(
-                    "Port is already initialized: {}".format(self))
+            # else:
+            #     raise FlowError(
+            #         "Port is already initialized: {}".format(self))
         # a Stream instance indicates that each item in the stream should be
         # yielded as a separate packet.  This is used to differentiate between
         # a port which may expect a single packet to contain a list of data.

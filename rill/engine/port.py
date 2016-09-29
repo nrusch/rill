@@ -434,14 +434,15 @@ class BasePortCollection(PortContainerMixin):
     # lookup of ports, which could clash with actual attributes and methods.
     _valid_classes = (BasePort,)
 
-    def __init__(self, component, ports):
+    def __init__(self, ports):
         """
         Parameters
         ----------
-        component : ``rill.engine.component.Component``
         ports : Iterable[``BasePort``]
         """
-        self.component = component
+        components = set(x.component for x in ports)
+        assert len(components) == 1
+        self.component = components.pop()
         self._ports = OrderedDict((p.name, p) for p in self._prep_args(ports))
         self._check_port_types()
 
@@ -485,8 +486,8 @@ class PortCollection(BasePortCollection):
     Acts as a Mapping Container for ports, as well as provides attribute-based
     lookups.
     """
-    def __init__(self, component, ports):
-        super(PortCollection, self).__init__(component, ports)
+    def __init__(self, ports):
+        super(PortCollection, self).__init__(ports)
         for pname, port in self._ports.items():
             setattr(self, pname, port)
 

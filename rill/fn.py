@@ -58,19 +58,19 @@ def synced(*ports):
     ``rill.engine.inputport.SynchronousInputCollection``
     """
     from rill.engine.inputport import SynchronizedInputCollection
-    return SynchronizedInputCollection(current_component(), ports)
+    return SynchronizedInputCollection(ports)
 
 
 def eager_merged(*ports):
     from rill.engine.inputport import EagerInputCollection
-    return EagerInputCollection(current_component(), ports)
+    return EagerInputCollection(ports)
 
 
 def load_balanced(*ports):
     from rill.engine.outputport import LoadBalancedOutputCollection
-    return LoadBalancedOutputCollection(current_component(), ports)
+    return LoadBalancedOutputCollection(ports)
 
 
 def forked(*ports):
     from rill.engine.outputport import ForkedOutputCollection
-    return ForkedOutputCollection(current_component(), ports)
+    return ForkedOutputCollection(ports)

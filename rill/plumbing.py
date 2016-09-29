@@ -529,13 +529,18 @@ class RuntimeHandler(object):
         msg.sendto(self.socket)
 
     def send_log_record(self, record):
+        """
+        Parameters
+        ----------
+        record : ``logging.LogRecord``
+        """
         if getattr(record, 'graph', False):
             Message(
                 protocol='network',
                 command='log',
                 payload={
                     'graph': record.graph,
-                    'message': record.msg % record.args
+                    'message': record.getMessage()
                 },
                 revision=self.revision
             ).sendto(self.socket)
@@ -731,7 +736,8 @@ class RuntimeHandler(object):
         elif command in ('addinport', 'addoutport'):
             send_component = True
             self.runtime.add_export(get_graph(), payload['node'],
-                                    payload['port'], payload['public'], payload['metadata'])
+                                    payload['port'], payload['public'],
+                                    payload['metadata'])
             # update_subnet(get_graph())
         elif command == 'removeinport':
             send_component = True
@@ -835,7 +841,7 @@ class RuntimeHandler(object):
                 command='component',
                 payload=self.runtime._component_types[
                     'abc/{}'.format(get_graph())]['spec'],
-                revision = self.revision
+                revision=self.revision
             )
             message.sendto(self.socket)
 

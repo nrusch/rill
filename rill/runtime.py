@@ -315,6 +315,22 @@ class Runtime(object):
 
     # Components --
 
+    def update_graph_component(self, graph):
+        """
+        Update the graph component spec
+
+        Parameters
+        ----------
+        graph : ``Graph``
+        """
+        # FIXME: better way to find the component class?
+        for name, component in dict(self._component_types).items():
+            component_class = component['class']
+            subgraph = getattr(component_class, 'subgraph', None)
+            if subgraph == graph:
+                self.register_component(component_class, overwrite=True)
+                break
+
     def register_graph_component(self, graph):
         subgraph = make_subgraph(graph)
         self.register_component(subgraph, overwrite=True)
@@ -665,6 +681,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.export("{}.{}".format(node, port), public, metadata)
+        self.update_graph_component(graph)
 
     def remove_inport(self, graph_id, public):
         """
@@ -672,6 +689,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.remove_inport(public)
+        self.update_graph_component(graph)
 
     def remove_outport(self, graph_id, public):
         """
@@ -679,6 +697,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.remove_outport(public)
+        self.update_graph_component(graph)
 
     def change_inport(self, graph_id, public, metadata):
         """
@@ -700,6 +719,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.rename_inport(from_name, to_name)
+        self.update_graph_component(graph)
 
     def rename_outport(self, graph_id, from_name, to_name):
         """
@@ -707,6 +727,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.rename_outport(from_name, to_name)
+        self.update_graph_component(graph)
 
     def change_graph(self, graph_id, description=None, metadata={}):
         """

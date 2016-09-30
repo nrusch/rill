@@ -11,7 +11,7 @@ import gevent
 
 from mock import MagicMock, patch
 import rill.plumbing as plumbing
-from rill.plumbing import Client, RuntimeServer, Message
+from rill.plumbing import RuntimeClient, RuntimeServer, Message
 from rill.runtime import Runtime
 
 import zmq.green as zmq
@@ -164,7 +164,7 @@ def test_runtime_flow():
     server = RuntimeServer(runtime, 4556)
 
     on_response = MagicMock()
-    client = Client(on_response)
+    client = RuntimeClient(on_response)
 
     gevent.spawn(server.start)
     client.connect('tcp://localhost', 4556)

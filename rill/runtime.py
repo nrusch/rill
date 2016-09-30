@@ -1,20 +1,17 @@
 import os
 import pydoc
 import logging
-from collections import OrderedDict
 import inspect
-import weakref
 from functools import wraps
 
 import gevent
-import geventwebsocket
 
 from rill.engine.component import Component
 from rill.engine.network import Graph, Network
 from rill.engine.subnet import SubGraph, make_subgraph
 from rill.engine.types import FBP_TYPES, Stream
 from rill.engine.exceptions import FlowError
-from rill.plumbing import Client, RuntimeServer, Message
+from rill.plumbing import RuntimeServer
 from rill.compat import *
 from rill.utils.observer import supports_listeners
 

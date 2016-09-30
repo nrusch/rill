@@ -241,7 +241,10 @@ class Message(object):
         socket.send_multipart(frames)
 
 
-class Client(object):
+class RuntimeClient(object):
+    """
+    ZMQ RuntimeClient for communicating with RuntimeServer
+    """
     def __init__(self, on_recv):
         self.ctx = zmq.Context()
         # pipe to client agent
@@ -304,7 +307,7 @@ class Client(object):
 
 class ClientConnection(object):
     """
-    One connection from Client to RuntimeServer
+    One connection from RuntimeClient to RuntimeServer
     """
     expiry = 0  # Expires at this time
     requests = 0  # How many snapshot requests made?
@@ -348,7 +351,7 @@ class ClientConnection(object):
             self.subscriber.setsockopt(zmq.SUBSCRIBE, join(subtopic, graph))
 
 
-# Client States
+# RuntimeClient States
 STATE_INITIAL = 0  # Before asking server for state
 STATE_SYNCING = 1  # Getting state from server
 STATE_ACTIVE = 2  # Getting new updates from server
@@ -1181,7 +1184,7 @@ def run_client():
     def on_recv(msg):
         print("RECV: %r" % msg)
     # Create and connect client
-    client = Client(on_recv)
+    client = RuntimeClient(on_recv)
     # client.graph = b''
     client.connect("tcp://localhost", 5556)
     # client.connect("tcp://localhost", 5566)

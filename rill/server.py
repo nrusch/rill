@@ -8,7 +8,7 @@ import logging
 import gevent
 import geventwebsocket
 
-from rill.plumbing import Client, Message
+from rill.plumbing import RuntimeClient, Message
 from rill.runtime import DEFAULTS
 
 
@@ -38,7 +38,7 @@ class WebSocketRuntimeApplication(geventwebsocket.WebSocketApplication):
         return 'noflo'
 
     def on_open(self):
-        self.client = Client(self.on_response)
+        self.client = RuntimeClient(self.on_response)
         self.client.connect("tcp://localhost", 5556)
 
     def on_close(self, reason):

@@ -1,6 +1,5 @@
 from abc import ABCMeta, abstractmethod
 from rill.compat import *
-from typing import Callable
 
 
 @add_metaclass(ABCMeta)
@@ -10,28 +9,13 @@ class GraphDispatcher(object):
     destination graph store, such as a database, socket connection, or
     in-memory representation.
     """
-    def __init__(self, responder=None):
+    def __init__(self, dispatcher):
         """
         Parameters
         ----------
-        responder : Callable[[rill.plumbing.Message], None]
+        dispatcher : plumbing.MessageDispatcher
         """
-        self._responder = responder
-
-    def send_message(self, msg):
-        if self._responder is not None:
-            self._responder(msg)
-
-    def send_error(self, failed_msg, err):
-        msg = Message(
-            protocol=failed_msg.protocol,
-            command=b'error',
-            payload={
-                'message': err.message,
-                'stack': traceback.format_exc(),
-                'request_id': failed_msg.id
-            })
-        self.send_message(msg)
+        self.dispatcher = dispatcher
 
     @abstractmethod
     def recv_message(self, msg):

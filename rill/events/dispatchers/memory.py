@@ -26,8 +26,8 @@ class InMemoryGraphDispatcher(GraphDispatcher):
     """
     Propagate updates to a set of in-memory Graph objects
     """
-    def __init__(self, responder=None):
-        super(InMemoryGraphDispatcher, self).__init__(responder)
+    def __init__(self, dispatcher=None):
+        super(InMemoryGraphDispatcher, self).__init__(dispatcher)
         self._graphs = {}  # type: Dict[str, Graph]
         self._component_types = {}
 

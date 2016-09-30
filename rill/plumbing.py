@@ -106,6 +106,7 @@ class Message(object):
         self._id = id
         self.revision = revision
         self._graph_id = None
+        self.identity = None
 
     def __repr__(self):
         s = "%s/%s" % (self.protocol, self.command)
@@ -522,59 +523,30 @@ class RuntimeHandler(object):
     """
     Utility class for processing messages into changes to a Runtime
     """
-    def __init__(self, runtime, publish_socket, response_socket):
+    def __init__(self, runtime, dispatcher):
         from rill.engine.component import _logger
         _logger.addHandler(RuntimeComponentLogHandler(self))
 
         self.runtime = runtime
-        # current revision of runtime state. used to ensure sync between
-        # snapshot and subsequent publishes
-        self.revision = 0
-        # sockets we're sending output changes on
-        # publish update to all clients:
-        self.publish_socket = publish_socket
-        # respond to the client that issued the update (e.g. for errors):
-        self.response_socket = response_socket
         self.logger = logging.getLogger('{}.{}'.format(
             self.__class__.__module__, self.__class__.__name__))
 
         self.runtime.port_opened.event.listen(self.send_port_opened)
         self.runtime.port_closed.event.listen(self.send_port_closed)
 
-    def send(self, msg):
-        msg.revision = self.revision
-        msg.sendto(self.publish_socket)
-
-    def send_revision(self, msg):
-        """
-        Increment the revision, add it to the message, and send it on
-        `self.publish_socket`
-
-        This sends confirmation to all clients (including the originator of the
-        message) that the update was successfully committed on the server.
-
-        Parameters
-        ----------
-        msg : Message
-        """
-        self.revision += 1
-        msg.revision = self.revision
-        # re-publish to all clients with a revision number
-        # print("Re-publishing with key %r" % key)
-        msg.sendto(self.publish_socket)
+        self.dispatcher = dispatcher
 
     def send_log_record(self, record):
         if hasattr(record, 'graph'):
-            msg = Message(
+            self.dispatcher.send_info(
                 protocol=b'network',
                 command=b'log',
                 payload={
                     'graph': record.graph,
                     'message': record.msg % record.args
                 })
-            self.send(msg)
 
-    def handle_message(self, msg, identity):
+    def handle_message(self, msg):
         """
         Main entry point for handing a message
 
@@ -606,7 +578,7 @@ class RuntimeHandler(object):
         try:
             handler(msg)
         except (FlowError, RillRuntimeError) as err:
-            self.send_error(msg, err, identity)
+            self.dispatcher.send_error(msg, err)
 
     # Utilities --
 
@@ -700,7 +672,6 @@ class RuntimeHandler(object):
         """
         command = msg.command
         payload = msg.payload
-        message_id = msg.id
 
         def get_graph():
             try:
@@ -862,15 +833,13 @@ class RuntimeHandler(object):
             # FIXME: quit? dump message?
             return
 
-        self.send_revision(msg)
+        self.dispatcher.send_revision(msg)
         if send_component:
-            msg = Message(
+            self.dispatcher.send_info(
                 protocol=b'component',
                 command=b'component',
                 payload=self.runtime._component_types[
-                    'abc/{}'.format(get_graph())]['spec']
-            )
-            self.send(msg)
+                    'abc/{}'.format(get_graph())]['spec'])
 
     def get_network_status(self, graph_id):
         started, running = self.runtime.get_status(graph_id)
@@ -884,7 +853,8 @@ class RuntimeHandler(object):
 
     def send_network_status(self, msg, command):
         status = self.get_network_status(msg.graph_id)
-        self.send_revision(msg.replace(command=command, payload=status))
+        self.dispatcher.send_revision(msg.replace(command=command,
+                                                  payload=status))
 
     def send_network_data(self, connection, outport, inport, packet):
         edge_id = '{}.{}{} -> {}.{}{}'.format(
@@ -893,7 +863,7 @@ class RuntimeHandler(object):
             inport.component.name, inport.name,
             '[{}]'.format(inport.index) if inport.index else '')
 
-        msg = Message(
+        self.dispatcher.send_info(
             protocol=b'network',
             command=b'data',
             payload={
@@ -910,10 +880,9 @@ class RuntimeHandler(object):
                 'id': edge_id,
                 'graph': inport.component.network.graph.name
             })
-        self.send(msg)
 
     def send_port_opened(self, graph, component, port):
-        msg = Message(
+        self.dispatcher.send_info(
             protocol=b'network',
             command=b'portopen',
             payload={
@@ -923,10 +892,9 @@ class RuntimeHandler(object):
                 'index': port.index,
                 'type': 'inport' if port.kind == 'in' else 'outport'
             })
-        self.send(msg)
 
     def send_port_closed(self, graph, component, port):
-        msg = Message(
+        self.send_info(
             protocol=b'network',
             command=b'portclosed',
             payload={
@@ -936,7 +904,6 @@ class RuntimeHandler(object):
                 'index': port.index,
                 'type': 'inport' if port.kind == 'in' else 'outport'
             })
-        self.send(msg)
 
     def handle_network(self, msg):
         """
@@ -972,17 +939,84 @@ class RuntimeHandler(object):
 
         self.send_network_status(msg, reply)
 
-    def send_error(self, failed_msg, err, identity):
+
+class MessageDispatcher(object):
+    """
+    Utility class to simplify sending messages to the correct sockets.
+
+    By encapsulating this functionality, it can be passed from the server to
+    other classes.
+    """
+    def __init__(self, publish_socket, response_socket, revision=0):
+        # current revision of runtime state. used to ensure sync between
+        # snapshot and subsequent publishes
+        self.revision = revision
+        # sockets we're sending output changes on
+        # publish update to all clients:
+        self.publish_socket = publish_socket
+        # respond to the client that issued the update (e.g. for errors):
+        self.response_socket = response_socket
+
+    def send_info(self, protocol, command, payload):
+        """
+        Tag a message with the current revision and send it on `self.publisher`
+
+        Messages sent via `send_info` originate on the runtime.  They
+        represent ephemeral data.
+
+        For message that resulted in state changes, see `send_revision`.
+        """
+        msg = Message(
+            protocol=protocol,
+            command=command,
+            payload=payload,
+            revision=self.revision
+        )
+        msg.sendto(self.publish_socket)
+
+    def send_revision(self, msg):
+        """
+        Increment the revision, add it to the message, and send it on
+        `self.publisher`
+
+        Messages sent via `send_revision` are expected to not have originated
+        from a client, and represent a change of state.
+
+        This sends confirmation to all clients (including the originator of the
+        message) that the update was successfully committed on the server.
+
+        Parameters
+        ----------
+        msg : Message
+        """
+        assert msg.identity is not None
+        self.revision += 1
+        msg.revision = self.revision
+        # re-publish to all clients with a revision number
+        # print("Re-publishing with key %r" % key)
+        msg.sendto(self.publish_socket)
+
+    def send_error(self, failed_msg, err, trace=None):
+        """
+        Send an error back to the client.
+
+        Parameters
+        ----------
+        failed_msg : Message
+        err : Exception
+        trace : str
+        """
+        assert failed_msg.identity is not None
         msg = Message(
             protocol=failed_msg.protocol,
             command=b'error',
             payload={
                 'message': err.message,
-                'stack': traceback.format_exc(),
+                'stack': trace or traceback.format_exc(),
                 'request_id': failed_msg.id
             },
             revision=self.revision)
-        msg.sendto(self.response_socket, identity)
+        msg.sendto(self.response_socket, failed_msg.identity)
 
 
 class RuntimeServer(object):
@@ -1018,7 +1052,8 @@ class RuntimeServer(object):
         # Register handlers with reactor
         self.collector.on_recv(self.handle_message)
 
-        self.handler = RuntimeHandler(runtime, self.publisher, self.collector)
+        self.dispatcher = MessageDispatcher(self.publisher, self.collector)
+        self.handler = RuntimeHandler(runtime, self.dispatcher)
 
     def start(self):
         print("Server listening on port %d" % self.port)
@@ -1038,27 +1073,31 @@ class RuntimeServer(object):
 
         self.loop.stop()
 
+    # --
+
     # def publish(self, key, command, payload, id, revision):
     #     self.publisher.send_multipart(
     #         [key, command, payload, id, bytes(revision)])
 
     def handle_message(self, msg_frames):
         """
+        Message recevied callback (from ROUTER socket).
+
         Parameters
         ----------
         msg_frames : List[bytes]
         """
         # first frame of a router message is the identity of the dealer
-        # FIXME: make Message track the identity so we don't have to pass it everywhere
         identity = msg_frames.pop(0)
         msg = Message.from_frames(*msg_frames)
+        msg.identity = identity
 
         if msg.protocol == 'internal':
-            self.handle_snapshot(msg, identity)
+            self.handle_snapshot(msg)
         else:
-            self.handle_collect(msg, identity)
+            self.handle_collect(msg)
 
-    def handle_snapshot(self, msg, identity):
+    def handle_snapshot(self, msg):
         """snapshot requests"""
         from rill.runtime import RillRuntimeError
 
@@ -1074,28 +1113,28 @@ class RuntimeServer(object):
                     graph = self.runtime.get_graph(graph_id)
                     for command, payload in get_graph_messages(graph, graph_id):
                         Message(b'graph', command, payload).sendto(
-                            self.collector, identity)
+                            self.collector, msg.identity)
 
                     # send the network status
                     status = self.handler.get_network_status(graph_id)
                     Message(b'network', b'status', status).sendto(
-                        self.collector, identity)
+                        self.collector, msg.identity)
 
                 except RillRuntimeError as err:
-                    self.send_error('graph', err, msg.id, identity)
+                    self.dispatcher.send_error(msg, err)
 
             else:
                 # sync runtime state
                 # initial connection
                 meta = self.runtime.get_runtime_meta()
                 Message(b'runtime', b'runtime', meta).sendto(
-                    self.collector, identity)
+                    self.collector, msg.identity)
 
                 # send list of component specs
                 # FIXME: move this under 'runtime' protocol?
                 for spec in self.runtime.get_all_component_specs():
                     Message(b'component', b'component', spec).sendto(
-                        self.collector, identity)
+                        self.collector, msg.identity)
 
                 # send list of graphs
                 # FIXME: move this under 'runtime' protocol?
@@ -1105,7 +1144,7 @@ class RuntimeServer(object):
                     Message(b'graph', b'graph', {
                         'id': graph_id,
                         'metadata': graph.metadata
-                    }).sendto(self.collector, identity)
+                    }).sendto(self.collector, msg.identity)
 
         else:
             print("E: bad request, aborting")
@@ -1114,26 +1153,18 @@ class RuntimeServer(object):
             return
 
         # Now send END message with revision number
-        logging.info("I: Sending state snapshot=%d" % self.handler.revision)
-        Message(b'internal', b'endsync', self.handler.revision).sendto(
-            self.collector, identity)
+        logging.info("I: Sending state snapshot=%d" % self.dispatcher.revision)
+        Message(b'internal', b'endsync', self.dispatcher.revision).sendto(
+            self.collector, msg.identity)
 
-    def handle_collect(self, msg, identity):
+    def handle_collect(self, msg):
         """
         handle messages pushed from client
         """
         print("handle_collect: %s" % str(msg))
 
         # FIXME: should the revision be per-graph?
-        self.handler.handle_message(msg, identity)
-
-    def send_error(self, protocol, err, message_id, identity):
-        Message(protocol, b'error', {
-            'message': err.message,
-            'stack': traceback.format_exc(),
-            'request_id': message_id
-        }, revision=self.handler.revision).sendto(
-            self.collector, identity)
+        self.handler.handle_message(msg)
 
 
 def run_server():

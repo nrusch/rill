@@ -16,8 +16,8 @@ class SandboxedGraphDispatcher(GraphDispatcher):
     # the latter cuts out the middle-man, but requires the InMemoryGraphDispatcher
     # to be capable of doing more, such as tracking the revision. it also means
     # the revision has to be per-graph, instead of global, which gets complicated
-    def __init__(self, responder=None):
-        super(SandboxedGraphDispatcher, self).__init__(responder)
+    def __init__(self, dispatcher):
+        super(SandboxedGraphDispatcher, self).__init__(dispatcher)
         self._graphs = {}
 
     def _forward(self, msg):

@@ -37,18 +37,6 @@ _logger.addFilter(ComponentFilter())
 logger = LogFormatter(_logger, {})
 
 
-class RuntimeComponentHandler(logging.Handler):
-    lock = False
-    level = _logger.level
-
-    def __init__(self, runtime_handler):
-        self.runtime_handler = runtime_handler
-        return super(logging.Handler, self).__init__()
-
-    def emit(self, record):
-        self.runtime_handler.send_log_record(record)
-
-
 @inport(IN_NULL)
 @outport(OUT_NULL)
 @add_metaclass(ABCMeta)

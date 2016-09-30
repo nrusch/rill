@@ -417,6 +417,10 @@ class Runtime(object):
         print("get_status.  started {}, running {}".format(started, running))
         return started, running
 
+    # these listeners exist to allow chaining from:
+    #   graph/network -> Runtime -> plumbing.RuntimeHandler
+    # would be nice to simplify this
+
     @supports_listeners
     def port_opened(self, graph, component, port):
         self.port_opened.event.emit(graph, component, port)

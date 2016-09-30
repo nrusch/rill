@@ -1,5 +1,3 @@
-#None based on The Clustered Hashmap Protocol: http://rfc.zeromq.org/spec:12/CHP/
-
 from __future__ import print_function
 import os
 import logging
@@ -75,6 +73,24 @@ def dump(msg_or_socket):
             print(r"0x%s" % (binascii.hexlify(part).decode('ascii')))
 
 
+class RuntimeComponentLogHandler(logging.Handler):
+    # FIXME: what does this do?  It seems wrong that it's a bool. It's supposed to be a lock, or None.
+    lock = False
+
+    def __init__(self, runtime_handler):
+        """
+
+        Parameters
+        ----------
+        runtime_handler : RuntimeHandler
+        """
+        self.runtime_handler = runtime_handler
+        super(RuntimeComponentLogHandler, self).__init__()
+
+    def emit(self, record):
+        self.runtime_handler.send_log_record(record)
+
+
 class Message(object):
     """
     Holds the properties of a FBP message.
@@ -89,7 +105,7 @@ class Message(object):
         self._payload = payload
         self._id = id
         self.revision = revision
-        self.graph_id = None
+        self._graph_id = None
 
     def __repr__(self):
         s = "%s/%s" % (self.protocol, self.command)
@@ -121,7 +137,7 @@ class Message(object):
             revision = int(revision)
         msg = cls(protocol, command, None, message_id, revision)
         msg._raw_payload = raw_payload
-        msg.graph_id = graph_id
+        msg._graph_id = graph_id
         return msg
 
     @property
@@ -132,6 +148,15 @@ class Message(object):
         if self._id is None:
             self._id = bytes(uuid.uuid1())
         return self._id
+
+    @property
+    def graph_id(self):
+        if self._graph_id is None and self.protocol in {'network', 'graph'}:
+            if 'graph' in self.payload:
+                self._graph_id = self.payload['graph']
+            elif self.protocol == 'graph' and 'id' in self.payload:
+                self._graph_id = self.payload['id']
+        return self._graph_id
 
     @property
     def payload(self):
@@ -184,15 +209,16 @@ class Message(object):
     def sendto(self, socket, prefix=None):
         """
         Send this Message to a socket.
+
+        prefix : bytes
+            Additional frame to insert at the beginning of the message. Usually
+            used for the identity.
         """
         # For PUB sockets we add the graph id to the first frame for
         # subscriptions to match against
-        if is_socket_type(socket, zmq.PUB) and (self.protocol in ['network', 'graph']):
-            if self.graph_id is None:
-                if 'graph' in self.payload:
-                    self.graph_id = self.payload['graph']
-                elif self.protocol == 'graph' and 'id' in self.payload:
-                    self.graph_id = self.payload['id']
+        # FIXME: always add the graph_id to the first frame, because this lets
+        # us route the message without deserializing the payload.
+        if is_socket_type(socket, zmq.PUB):
             assert self.graph_id is not None
             # FIXME: we may need to encode the graph_id if it's unicode
             key = join(self.protocol, self.graph_id)
@@ -397,7 +423,7 @@ def client_agent_loop(ctx, pipe, on_recv):
             if agent.graph:
                 print("switching to graph sync state")
                 Message(
-                    'internal', 'startsync', agent.graph, agent.message_id
+                    b'internal', b'startsync', agent.graph, agent.message_id
                 ).sendto(conn.publisher)
                 # wipe the graph subscription request so that we don't get
                 # here unless the graph has changed
@@ -496,27 +522,36 @@ class RuntimeHandler(object):
     """
     Utility class for processing messages into changes to a Runtime
     """
-    def __init__(self, runtime, socket, responder):
-        from rill.engine.component import _logger, RuntimeComponentHandler
-        _logger.addHandler(RuntimeComponentHandler(self))
+    def __init__(self, runtime, publish_socket, response_socket):
+        from rill.engine.component import _logger
+        _logger.addHandler(RuntimeComponentLogHandler(self))
 
         self.runtime = runtime
         # current revision of runtime state. used to ensure sync between
         # snapshot and subsequent publishes
         self.revision = 0
-        # socket we're sending output changes on
-        self.socket = socket
-        self.responder = responder
+        # sockets we're sending output changes on
+        # publish update to all clients:
+        self.publish_socket = publish_socket
+        # respond to the client that issued the update (e.g. for errors):
+        self.response_socket = response_socket
         self.logger = logging.getLogger('{}.{}'.format(
             self.__class__.__module__, self.__class__.__name__))
 
         self.runtime.port_opened.event.listen(self.send_port_opened)
         self.runtime.port_closed.event.listen(self.send_port_closed)
 
+    def send(self, msg):
+        msg.revision = self.revision
+        msg.sendto(self.publish_socket)
+
     def send_revision(self, msg):
         """
         Increment the revision, add it to the message, and send it on
-        `self.socket`
+        `self.publish_socket`
+
+        This sends confirmation to all clients (including the originator of the
+        message) that the update was successfully committed on the server.
 
         Parameters
         ----------
@@ -526,19 +561,18 @@ class RuntimeHandler(object):
         msg.revision = self.revision
         # re-publish to all clients with a revision number
         # print("Re-publishing with key %r" % key)
-        msg.sendto(self.socket)
+        msg.sendto(self.publish_socket)
 
     def send_log_record(self, record):
-        if getattr(record, 'graph', False):
-            Message(
-                protocol='network',
-                command='log',
+        if hasattr(record, 'graph'):
+            msg = Message(
+                protocol=b'network',
+                command=b'log',
                 payload={
                     'graph': record.graph,
                     'message': record.msg % record.args
-                },
-                revision=self.revision
-            ).sendto(self.socket)
+                })
+            self.send(msg)
 
     def handle_message(self, msg, identity):
         """
@@ -572,7 +606,7 @@ class RuntimeHandler(object):
         try:
             handler(msg)
         except (FlowError, RillRuntimeError) as err:
-            self.send_error(msg.protocol, err, msg.id, identity)
+            self.send_error(msg, err, identity)
 
     # Utilities --
 
@@ -830,14 +864,13 @@ class RuntimeHandler(object):
 
         self.send_revision(msg)
         if send_component:
-            message = Message(
-                protocol='component',
-                command='component',
+            msg = Message(
+                protocol=b'component',
+                command=b'component',
                 payload=self.runtime._component_types[
-                    'abc/{}'.format(get_graph())]['spec'],
-                revision = self.revision
+                    'abc/{}'.format(get_graph())]['spec']
             )
-            message.sendto(self.socket)
+            self.send(msg)
 
     def get_network_status(self, graph_id):
         started, running = self.runtime.get_status(graph_id)
@@ -850,7 +883,7 @@ class RuntimeHandler(object):
         }
 
     def send_network_status(self, msg, command):
-        status = self.get_network_status(msg.payload['graph'])
+        status = self.get_network_status(msg.graph_id)
         self.send_revision(msg.replace(command=command, payload=status))
 
     def send_network_data(self, connection, outport, inport, packet):
@@ -860,41 +893,50 @@ class RuntimeHandler(object):
             inport.component.name, inport.name,
             '[{}]'.format(inport.index) if inport.index else '')
 
-        msg = Message('network', 'data', {
-            'src': {
-                'node': outport.component.name,
-                'port': outport.name,
-                'index': outport.index
-            },
-            'tgt': {
-                'node': inport.component.name,
-                'port': inport.name,
-                'index': inport.index
-            },
-            'id': edge_id,
-            'graph': inport.component.network.graph.name
-        })
-        self.send_revision(msg)
+        msg = Message(
+            protocol=b'network',
+            command=b'data',
+            payload={
+                'src': {
+                    'node': outport.component.name,
+                    'port': outport.name,
+                    'index': outport.index
+                },
+                'tgt': {
+                    'node': inport.component.name,
+                    'port': inport.name,
+                    'index': inport.index
+                },
+                'id': edge_id,
+                'graph': inport.component.network.graph.name
+            })
+        self.send(msg)
 
     def send_port_opened(self, graph, component, port):
-        msg = Message('network', 'portopen', {
-            'graph': graph.name,
-            'node': component.name,
-            'port': port.name,
-            'index': port.index,
-            'type': 'inport' if port.kind == 'in' else 'outport'
-        })
-        self.send_revision(msg)
+        msg = Message(
+            protocol=b'network',
+            command=b'portopen',
+            payload={
+                'graph': graph.name,
+                'node': component.name,
+                'port': port.name,
+                'index': port.index,
+                'type': 'inport' if port.kind == 'in' else 'outport'
+            })
+        self.send(msg)
 
     def send_port_closed(self, graph, component, port):
-        msg = Message('network', 'portclosed', {
-            'graph': graph.name,
-            'node': component.name,
-            'port': port.name,
-            'index': port.index,
-            'type': 'inport' if port.kind == 'in' else 'outport'
-        })
-        self.send_revision(msg)
+        msg = Message(
+            protocol=b'network',
+            command=b'portclosed',
+            payload={
+                'graph': graph.name,
+                'node': component.name,
+                'port': port.name,
+                'index': port.index,
+                'type': 'inport' if port.kind == 'in' else 'outport'
+            })
+        self.send(msg)
 
     def handle_network(self, msg):
         """
@@ -904,7 +946,6 @@ class RuntimeHandler(object):
         ----------
         msg: Message
         """
-
         command = msg.command
         payload = msg.payload
         graph_id = payload['graph']
@@ -931,12 +972,17 @@ class RuntimeHandler(object):
 
         self.send_network_status(msg, reply)
 
-    def send_error(self, protocol, err, message_id, identity):
-        Message(protocol, 'error', {
-            'message': err.message,
-            'stack': traceback.format_exc(),
-            'request_id': message_id
-        }, revision=self.revision).sendto(self.responder, identity)
+    def send_error(self, failed_msg, err, identity):
+        msg = Message(
+            protocol=failed_msg.protocol,
+            command=b'error',
+            payload={
+                'message': err.message,
+                'stack': traceback.format_exc(),
+                'request_id': failed_msg.id
+            },
+            revision=self.revision)
+        msg.sendto(self.response_socket, identity)
 
 
 class RuntimeServer(object):
@@ -952,12 +998,14 @@ class RuntimeServer(object):
         self.ctx = zmq.Context()
         # IOLoop reactor
         self.loop = IOLoop.instance()
+        assert isinstance(self.loop, IOLoop)
 
         # Set up our client server sockets
 
         # Publish updates to clients
         self.publisher = self.ctx.socket(zmq.PUB)
-        # Collect updates and snapshot requests from clients
+        # Collect updates and snapshot requests from clients, and send back
+        # errors
         self.collector = self.ctx.socket(zmq.ROUTER)
 
         self.collector.bind("tcp://*:%d" % (self.port))
@@ -994,9 +1042,16 @@ class RuntimeServer(object):
     #     self.publisher.send_multipart(
     #         [key, command, payload, id, bytes(revision)])
 
-    def handle_message(self, msg):
-        identity = msg.pop(0)
-        msg = Message.from_frames(*msg)
+    def handle_message(self, msg_frames):
+        """
+        Parameters
+        ----------
+        msg_frames : List[bytes]
+        """
+        # first frame of a router message is the identity of the dealer
+        # FIXME: make Message track the identity so we don't have to pass it everywhere
+        identity = msg_frames.pop(0)
+        msg = Message.from_frames(*msg_frames)
 
         if msg.protocol == 'internal':
             self.handle_snapshot(msg, identity)
@@ -1011,6 +1066,7 @@ class RuntimeServer(object):
 
         if (msg.protocol, msg.command) == ('internal', 'startsync'):
             if msg.payload:
+                # sync graph state
                 graph_id = msg.payload
                 print("Graph id: %s" % graph_id)
 
@@ -1029,6 +1085,7 @@ class RuntimeServer(object):
                     self.send_error('graph', err, msg.id, identity)
 
             else:
+                # sync runtime state
                 # initial connection
                 meta = self.runtime.get_runtime_meta()
                 Message(b'runtime', b'runtime', meta).sendto(
@@ -1071,7 +1128,7 @@ class RuntimeServer(object):
         self.handler.handle_message(msg, identity)
 
     def send_error(self, protocol, err, message_id, identity):
-        Message(protocol, 'error', {
+        Message(protocol, b'error', {
             'message': err.message,
             'stack': traceback.format_exc(),
             'request_id': message_id
@@ -1105,7 +1162,7 @@ def run_client():
 
     print("sending graph")
     for command, payload in get_graph_messages(graph, graph_id):
-        client.send(Message('graph', command, payload))
+        client.send(Message(b'graph', command, payload))
     gevent.joinall([client.agent])
 
 

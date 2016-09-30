@@ -315,15 +315,25 @@ class Runtime(object):
 
     # Components --
 
-    def get_subnet_component(self, graph_id):
-        graph = self.get_graph(graph_id)
-        Sub = make_subgraph(graph, name=str(graph_id))
-        return Sub
+    def update_graph_component(self, graph):
+        """
+        Update the graph component spec
 
-    def register_subnet(self, graph_id):
-        subnet = self.get_subnet_component(graph_id)
-        self.register_component(subnet, True)
-        return subnet.get_spec()
+        Parameters
+        ----------
+        graph : ``Graph``
+        """
+        # FIXME: better way to find the component class?
+        for name, component in dict(self._component_types).items():
+            component_class = component['class']
+            subgraph = getattr(component_class, 'subgraph', None)
+            if subgraph == graph:
+                self.register_component(component_class, overwrite=True)
+                break
+
+    def register_graph_component(self, graph):
+        subgraph = make_subgraph(graph)
+        self.register_component(subgraph, overwrite=True)
 
     def get_all_component_specs(self):
         """
@@ -336,6 +346,7 @@ class Runtime(object):
     def register_component(self, component_class, overwrite=False):
         """
         Register a component class.
+
         Parameters
         ----------
         component_class : Type[``rill.enginge.component.Component``]
@@ -501,9 +512,8 @@ class Runtime(object):
         except KeyError:
             raise RillRuntimeError('Requested graph not found')
 
-    def new_graph(
-        self, graph_id, description=None, metadata=None, overwrite=True
-    ):
+    def new_graph(self, graph_id, description=None, metadata=None,
+                  overwrite=True):
         """
         Create a new graph.
         """
@@ -517,19 +527,30 @@ class Runtime(object):
             metadata=metadata
         ))
 
-    def add_graph(self, graph_id, graph):
+    def add_graph(self, graph_id, graph, recursive=False, register=True):
         """
         Parameters
         ----------
         graph_id : str
         graph : ``rill.engine.network.Graph``
+        recursive : bool
+            Recursively add any subgraphs
+        register : bool
+            Register the graph as a component
         """
         self._graphs[graph_id] = graph
-
         graph.port_opened.event.listen(self.port_opened)
         graph.port_closed.event.listen(self.port_closed)
 
-        self.register_subnet(graph_id)
+        if register:
+            self.register_graph_component(graph)
+        if recursive:
+            for subgraph in graph.iter_children(types=[SubGraph]):
+                subgraph_type = subgraph.__class__
+                self.add_graph(subgraph_type.subgraph.name,
+                               subgraph_type.subgraph,
+                               recursive=False, register=False)
+                self.register_component(subgraph_type, overwrite=True)
 
     def add_node(self, graph_id, node_id, component_id, metadata):
         """
@@ -660,7 +681,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.export("{}.{}".format(node, port), public, metadata)
-        self.register_subnet(graph_id)
+        self.update_graph_component(graph)
 
     def remove_inport(self, graph_id, public):
         """
@@ -668,7 +689,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.remove_inport(public)
-        self.register_subnet(graph_id)
+        self.update_graph_component(graph)
 
     def remove_outport(self, graph_id, public):
         """
@@ -676,7 +697,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.remove_outport(public)
-        self.register_subnet(graph_id)
+        self.update_graph_component(graph)
 
     def change_inport(self, graph_id, public, metadata):
         """
@@ -698,7 +719,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.rename_inport(from_name, to_name)
-        self.register_subnet(graph_id)
+        self.update_graph_component(graph)
 
     def rename_outport(self, graph_id, from_name, to_name):
         """
@@ -706,7 +727,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         graph.rename_outport(from_name, to_name)
-        self.register_subnet(graph_id)
+        self.update_graph_component(graph)
 
     def change_graph(self, graph_id, description=None, metadata={}):
         """

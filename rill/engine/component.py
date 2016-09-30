@@ -46,6 +46,11 @@ class RuntimeComponentHandler(logging.Handler):
         return super(logging.Handler, self).__init__()
 
     def emit(self, record):
+        """
+        Parameters
+        ----------
+        record : logging.LogRecord
+        """
         self.runtime_handler.send_log_record(record)
 
 
@@ -112,7 +117,7 @@ class Component(object):
         Initialize internal attributes.
         """
         self.ports = PortCollection(
-            self, [p.create_port(self) for p in self.port_definitions().values()])
+            [p.create_port(self) for p in self.port_definitions().values()])
 
     # FIXME: rename to root_network
     @property

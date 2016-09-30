@@ -1,16 +1,11 @@
-import re
 from collections import OrderedDict
-from tests.components import Person, Company, PassthruPerson
+from tests.components import Company, PassthruPerson
 from rill.engine.jsonschema_types import to_jsonschema
 
 
 def test_schematics_port():
     spec = PassthruPerson.get_spec()
     inports = spec['inPorts']
-
-    print;print
-    print inports
-    print;print
 
     assert {
         'required': False,
@@ -38,6 +33,7 @@ def test_schematics_port():
                     'enum': ['cyan', 'magenta', 'chartreuse'],
                     'type': 'string'
                 }),
+                ('married', {'type': 'boolean'}),
                 ('phone_number', {
                     'type': 'string',
                     'maxLength': 8,
@@ -74,6 +70,7 @@ def test_to_jsonschema():
                         'type': 'string',
                         'enum': ['cyan', 'magenta', 'chartreuse'],
                     }),
+                    ('married', {'type': 'boolean'}),
                     ('phone_number', {
                         'type': 'string',
                         'pattern': r'\d{3}-\d{4}',
@@ -106,6 +103,7 @@ def test_to_jsonschema():
                             'type': 'string',
                             'enum': ['cyan', 'magenta', 'chartreuse'],
                         }),
+                        ('married', {'type': 'boolean'}),
                         ('phone_number', {
                             'type': 'string',
                             'pattern': r'\d{3}-\d{4}',

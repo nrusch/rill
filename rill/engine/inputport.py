@@ -202,9 +202,9 @@ class InputPort(Port, InputInterface):
                 raise FlowError(
                     "Port cannot have both an initial packet and a "
                     "connection: {}".format(self))
-            else:
-                raise FlowError(
-                    "Port is already initialized: {}".format(self))
+            # else:
+            #     raise FlowError(
+            #         "Port is already initialized: {}".format(self))
         # a Stream instance indicates that each item in the stream should be
         # yielded as a separate packet.  This is used to differentiate between
         # a port which may expect a single packet to contain a list of data.

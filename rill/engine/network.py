@@ -19,8 +19,10 @@ from rill.engine.inputport import Connection, InputPort, InputArray, Initializat
 from rill.engine.types import serialize, deserialize, Stream
 from rill.compat import *
 from rill.utils.observer import supports_listeners
+from rill.utils.common import NOT_SET
 
 from rill.engine.utils import CountDownLatch
+
 
 def merge_metadata(source_metadata, target_metadata):
     if source_metadata:
@@ -35,6 +37,7 @@ def merge_metadata(source_metadata, target_metadata):
 
     target_metadata.update(source_metadata)
     return target_metadata
+
 
 class Graph(object):
     """
@@ -190,6 +193,12 @@ class Graph(object):
 
         self.put_component(name, comp)
 
+        # FIXME: would this make more sense as part of creating a new port?
+        # add port defaults to the initializations dict if they're not provided
+        for name, inport in comp.inport_definitions.iteritems():
+            if name not in initializations and inport.default != NOT_SET:
+                initializations[name] = inport.default
+
         for name, value in initializations.items():
             receiver = comp.port(name, kind='in')
             if value is None and not receiver.required:
@@ -217,7 +226,7 @@ class Graph(object):
         self.set_node_metadata.event.emit(node, metadata)
         return node.metadata
 
-    def add_graph(self, graph, name=None, **initializations):
+    def add_graph(self, graph, bases=None, name=None, **initializations):
         """
         Instantiate a component and add it to the network.
 
@@ -225,6 +234,8 @@ class Graph(object):
         ----------
         graph : ``Graph``
             graph to add
+        bases : ``SubGraph`` | Iterable[``SubGraph``]
+            Base classes to be used when constructing a SubGraph class.
         name : str | None
             name of component within the graph
 
@@ -237,7 +248,7 @@ class Graph(object):
             raise ValueError(
                 'Must provide a name or the graph must have a name.')
         name = name or graph.name
-        comp_type = make_subgraph(graph, name=name)
+        comp_type = make_subgraph(graph, bases=bases, name=name)
         return self.add_component(name, comp_type, **initializations)
 
     @supports_listeners
@@ -645,6 +656,7 @@ class Graph(object):
         ----------
         content : Any
         receiver : Union[``rill.engine.inputport.InputPort``, str]
+        force : bool
         """
         inport = self.get_component_port(receiver, kind='in')
         inport.initialize(content)
@@ -684,6 +696,38 @@ class Graph(object):
             for error in errors:
                 logger.error(error)
             raise FlowError("Errors opening ports")
+
+    def iter_children(self, types=None, recursive=True):
+        """
+        Get all children components of the graph
+
+        Parameters
+        ----------
+        types : List[Type[``rill.enginge.component.Component``]]
+            Component types to filter to
+        recursive : bool
+            Recurse into subgraphs
+
+        Yields
+        ------
+        ``rill.enginge.component.Component``
+        """
+        from rill.engine.subnet import SubGraph
+
+        for component in self.get_components().values():
+            if types is None:
+                yield component
+            else:
+                for t in types:
+                    if isinstance(component, t):
+                        yield component
+                        # break our type loop so we don't yield the same
+                        # component twice
+                        break
+            if recursive and isinstance(component, SubGraph):
+                for x in component.subgraph.iter_children(
+                        types=types, recursive=recursive):
+                    yield x
 
     # Serialization --
 
@@ -763,12 +807,13 @@ class Graph(object):
         """
         from rill.utils import locate_class
 
+        graph = cls()
+
         def _port(p, kind):
             return graph.get_component_port((p['process'], p['port']),
                                             index=p.get('index', None),
                                             kind=kind)
 
-        graph = cls()
         for (name, spec) in definition['processes'].items():
             if component_lookup:
                 comp_class = component_lookup[spec['component']]

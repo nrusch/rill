@@ -88,6 +88,11 @@ class RuntimeComponentLogHandler(logging.Handler):
         super(RuntimeComponentLogHandler, self).__init__()
 
     def emit(self, record):
+        """
+        Parameters
+        ----------
+        record : logging.LogRecord
+        """
         self.runtime_handler.send_log_record(record)
 
 
@@ -540,13 +545,18 @@ class RuntimeHandler(object):
         self.dispatcher = dispatcher
 
     def send_log_record(self, record):
+        """
+        Parameters
+        ----------
+        record : logging.LogRecord
+        """
         if hasattr(record, 'graph'):
             self.dispatcher.send_info(
                 protocol=b'network',
                 command=b'log',
                 payload={
                     'graph': record.graph,
-                    'message': record.msg % record.args
+                    'message': record.getMessage()
                 })
 
     def handle_message(self, msg):
@@ -739,7 +749,8 @@ class RuntimeHandler(object):
         elif command in ('addinport', 'addoutport'):
             send_component = True
             self.runtime.add_export(get_graph(), payload['node'],
-                                    payload['port'], payload['public'], payload['metadata'])
+                                    payload['port'], payload['public'],
+                                    payload['metadata'])
             # update_subnet(get_graph())
         elif command == 'removeinport':
             send_component = True

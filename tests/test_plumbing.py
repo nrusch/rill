@@ -303,6 +303,7 @@ def test_runtime_flow():
 
     on_response.reset_mock()
 
+    # test adding invalid data errors
     addinitial = {
         'protocol': 'graph',
         'command': 'addinitial',

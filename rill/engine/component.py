@@ -100,7 +100,7 @@ class Component(object):
         Initialize internal attributes.
         """
         self.ports = PortCollection(
-            self, [p.create_port(self) for p in self.port_definitions().values()])
+            [p.create_port(self) for p in self.port_definitions().values()])
 
     # FIXME: rename to root_network
     @property

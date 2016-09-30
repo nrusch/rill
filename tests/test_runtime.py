@@ -116,3 +116,18 @@ def test_get_graph_messages():
     }) in messages
 
 
+def test_component_updates():
+    graph_id = 'graph1'
+    graph_name = 'My Graph'
+    runtime = Runtime()
+
+    graph, gen, passthru, outside = get_graph(graph_name)
+    runtime.add_graph(graph_id, graph)
+
+    component = runtime._component_types.get('abc/{0}'.format(graph.name))
+    assert component is not None
+    assert len(component['spec']['inPorts']) == 2
+    runtime.add_export(graph_id, gen.get_name(), 'COUNT', 'GEN_COUNT')
+    # grab the updated component
+    component = runtime._component_types.get('abc/{0}'.format(graph.name))
+    assert len(component['spec']['inPorts']) == 3

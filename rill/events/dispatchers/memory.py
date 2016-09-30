@@ -6,94 +6,14 @@ from rill.events.dispatchers.base import GraphDispatcher
 from typing import Dict
 
 
-ARG_REPLACEMENTS = (
-    ('graph', 'graph_id'),
-    ('node', 'node'),
-    ('id', 'node'),
-    ('from', 'from_name'),
-    ('to', 'to_name')
-)
-
-
-def _toargs(d):
-    for find, replace in ARG_REPLACEMENTS:
-        if find in d:
-            d[replace] = d[find]
-    return d
-
-
 class InMemoryGraphDispatcher(GraphDispatcher):
     """
     Propagate updates to a set of in-memory Graph objects
     """
-    def __init__(self, dispatcher=None):
-        super(InMemoryGraphDispatcher, self).__init__(dispatcher)
-        self._graphs = {}  # type: Dict[str, Graph]
+    def __init__(self):
+        # type: Dict[str, Graph]
+        self._graphs = {}  # Graph instances, keyed by graph ID
         self._component_types = {}
-
-    COMMAND_TO_METHOD = {
-        'graph': {
-            # 'clear': 'new_graph',
-            # 'addgraph': 'new_graph',
-            'changegraph': '_set_graph_metadata',
-            'renamegraph': '_rename_graph',
-            # Nodes
-            'addnode': '_add_node',
-            'removenode': '_remove_node',
-            'renamenode': '_rename_node',
-            'changenode': '_set_node_metadata',
-            # Edges/connections
-            'addedge': '_add_edge',
-            'removeedge': '_remove_edge',
-            'changeedge': '_set_edge_metadata',
-            # IIP / literals
-            'addinitial': '_initialize_port',
-            'removeinitial': '_uninitialize_port',
-            # Exported ports
-            'addinport': '_add_inport',
-            'addoutport': '_add_outport',
-            'removeinport': '_remove_inport',
-            'removeoutport': '_remove_outport',
-            'changeinport': '_set_inport_metadata',
-            'changeoutport': '_set_outport_metadata',
-            'renameinport': '_rename_inport',
-            'renameoutport': '_rename_outport',
-            # Groups
-            'addgroup': '_add_group',
-            'removegroup': '_remove_group',
-            'renamegroup': '_rename_group',
-            'changegroup': '_change_group',
-        }
-    }
-
-    def recv_message(self, msg):
-        """
-        Handle a FBP graph message
-
-        Parameters
-        ----------
-        msg: rill.plumbing.Message
-        """
-        if msg.protocol == 'graph' and msg.command == 'clear':
-            payload = msg.payload.copy()
-            graph_id = payload.pop('id')
-            self.runtime._new_graph(graph_id, **payload)
-        elif msg.protocol == 'graph' and msg.command == 'addgraph':
-            payload = msg.payload.copy()
-            graph_id = payload.pop('id')
-            self.runtime._new_graph(graph_id, overwrite=False, **payload)
-        else:
-            # automatic handling
-            try:
-                method_name = self.COMMAND_TO_METHOD[msg.protocol][msg.command]
-            except KeyError:
-                raise FlowError("Unknown command '%s' for protocol '%s'" %
-                                (msg.command, msg.protocol))
-
-            method = getattr(self, method_name)
-            method(**_toargs(msg.payload))
-
-    # -- utilities
 
     @staticmethod
     def _get_port(graph, data, kind):
@@ -118,6 +38,14 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         except KeyError:
             raise FlowError('Requested graph not found: {}'.format(graph_id))
 
+    # -- overrides
+
+    def new_graph(self, payload):
+        """
+        Create a new graph.
+        """
+        return self._new_graph(payload['id'])
+
     def add_graph(self, graph_id, graph):
         """
         Parameters
@@ -125,165 +53,219 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         graph_id : str
         graph : ``rill.engine.network.Graph``
         """
-        self._graphs[graph_id] = graph
+        self._add_graph(graph_id, graph)
 
-    # -- overrides
+    def set_graph_metadata(self, payload):
+        """
+        Set Metadata on graph
+        """
+        return self._set_graph_metadata(payload['graph'], payload['metadata'])
 
-    #
-    # def set_graph_metadata(self, msg):
-    #     """
-    #     Set Metadata on graph
-    #     """
-    #     return self._set_graph_metadata(**_toargs(msg.payload))
-    #
-    # def rename_graph(self, msg):
-    #     """
-    #     Change graph id
-    #     """
-    #     return self._rename_graph(**_toargs(msg.payload))
-    #
-    # def add_node(self, msg):
-    #     """
-    #     Add a component instance.
-    #     """
-    #     return self._add_node(**_toargs(msg.payload))
-    #
-    # def remove_node(self, msg):
-    #     """
-    #     Destroy component instance.
-    #     """
-    #     self._remove_node(**_toargs(msg.payload))
-    #
-    # def rename_node(self, msg):
-    #     """
-    #     Rename component instance.
-    #     """
-    #     self._rename_node(**_toargs(msg.payload))
-    #
-    # def set_node_metadata(self, msg):
-    #     """
-    #     Sends changenode event
-    #     """
-    #     self._set_node_metadata(**_toargs(msg.payload))
-    #
-    # def add_edge(self, msg):
-    #     """
-    #     Connect ports between components.
-    #     """
-    #     self._add_edge(**_toargs(msg.payload))
-    #
-    # def remove_edge(self, msg):
-    #     """
-    #     Disconnect ports between components.
-    #     """
-    #     self._remove_edge(**_toargs(msg.payload))
-    #
-    # def set_edge_metadata(self, msg):
-    #     """
-    #     Send changeedge event'
-    #     """
-    #     self._set_edge_metadata(**_toargs(msg.payload))
-    #
-    # def initialize_port(self, msg):
-    #     """
-    #     Set the inital packet for a component inport.
-    #     """
-    #     self._initialize_port(**_toargs(msg.payload))
-    #
-    # def uninitialize_port(self, msg):
-    #     """
-    #     Remove the initial packet for a component inport.
-    #     """
-    #     self._uninitialize_port(**_toargs(msg.payload))
-    #
-    # def add_inport(self, msg):
-    #     """
-    #     Add inport to graph
-    #     """
-    #     self._add_export(**_toargs(msg.payload))
-    #
-    # def remove_inport(self, msg):
-    #     """
-    #     Remove inport from graph
-    #     """
-    #     self._remove_inport(**_toargs(msg.payload))
-    #
-    # def set_inport_metadata(self, msg):
-    #     """
-    #     Send the metadata on an exported inport
-    #     """
-    #     self._set_inport_metadata(**_toargs(msg.payload))
-    #
-    # def rename_inport(self, msg):
-    #     """
-    #     Rename inport
-    #     """
-    #     self._rename_inport(**_toargs(msg.payload))
-    #
-    # def add_outport(self, msg):
-    #     """
-    #     Add outport to graph
-    #     """
-    #     self._add_export(**_toargs(msg.payload))
-    #
-    # def remove_outport(self, msg):
-    #     """
-    #     Remove outport from graph
-    #     """
-    #     self._remove_outport(**_toargs(msg.payload))
-    #
-    # def set_outport_metadata(self, msg):
-    #     """
-    #     Send the metadata on an exported inport
-    #     """
-    #     self._set_outport_metadata(**_toargs(msg.payload))
-    #
-    # def rename_outport(self, msg):
-    #     """
-    #     Rename outport
-    #     """
-    #     self._rename_outport(**_toargs(msg.payload))
-    #
-    # def add_group(self, msg):
-    #     """
-    #     Add group to graph
-    #     """
-    #     self._add_group(**_toargs(msg.payload))
-    #
-    # def remove_group(self, msg):
-    #     """
-    #     Remove group from graph
-    #     """
-    #     self._remove_group(**_toargs(msg.payload))
-    #
-    # def rename_group(self, msg):
-    #     """
-    #     Rename group
-    #     """
-    #     self._rename_group(**_toargs(msg.payload))
-    #
-    # def change_group(self, msg):
-    #     """
-    #     Rename group
-    #     """
-    #     self._change_group(**_toargs(msg.payload))
+    def rename_graph(self, payload):
+        """
+        Change graph id
+        """
+        return self._rename_graph(payload['from'], payload['to'])
+
+    def add_node(self, payload):
+        """
+        Add a component instance.
+        """
+        return self._add_node(payload['graph'], payload['id'],
+                       payload['component'],
+                       payload.get('metadata', {}))
+
+    def remove_node(self, payload):
+        """
+        Destroy component instance.
+        """
+        self._remove_node(payload['graph'], payload['id'])
+
+    def rename_node(self, payload):
+        """
+        Rename component instance.
+        """
+        self._rename_node(payload['graph'], payload['from'],
+                          payload['to'])
+
+    def set_node_metadata(self, payload):
+        """
+        Sends changenode event
+        """
+        self._set_node_metadata(payload['graph'],
+                                payload['id'],
+                                payload['metadata'])
+
+    def add_edge(self, payload):
+        """
+        Connect ports between components.
+        """
+        self._add_edge(payload['graph'], payload['src'],
+                       payload['tgt'],
+                       payload.get('metadata', {}))
+
+    def remove_edge(self, payload):
+        """
+        Disconnect ports between components.
+        """
+        self._remove_edge(payload['graph'], payload['src'],
+                          payload['tgt'])
+
+    def set_edge_metadata(self, payload):
+        """
+        Send changeedge event'
+        """
+        self._set_edge_metadata(payload['graph'],
+                                payload['src'],
+                                payload['tgt'],
+                                payload['metadata'])
+
+    def initialize_port(self, payload):
+        """
+        Set the inital packet for a component inport.
+        """
+        self._initialize_port(payload['graph'], payload['tgt'],
+                              payload['src']['data'])
+
+    def uninitialize_port(self, payload):
+        """
+        Remove the initial packet for a component inport.
+        """
+        self._uninitialize_port(payload['graph'],
+                                payload['tgt'])
+
+    def add_inport(self, payload):
+        """
+        Add inport to graph
+        """
+        self._add_export(payload['graph'], payload['node'],
+                         payload['port'], payload['public'],
+                         payload['metadata'])
+
+    def remove_inport(self, payload):
+        """
+        Remove inport from graph
+        """
+        self._remove_inport(payload['graph'], payload['public'])
+
+    def set_inport_metadata(self, payload):
+        """
+        Send the metadata on an exported inport
+        """
+        self._set_inport_metadata(payload['graph'], payload['public'],
+                            payload['metadata'])
+
+    def rename_inport(self, payload):
+        """
+        Rename inport
+        """
+        self._rename_inport(payload['graph'], payload['from'], payload['to'])
+
+    def add_outport(self, payload):
+        """
+        Add outport to graph
+        """
+        self._add_export(payload['graph'], payload['node'],
+                         payload['port'], payload['public'],
+                         payload['metadata'])
+
+    def remove_outport(self, payload):
+        """
+        Remove outport from graph
+        """
+        self._remove_outport(payload['graph'], payload['public'])
+
+    def set_outport_metadata(self, payload):
+        """
+        Send the metadata on an exported inport
+        """
+        self._set_outport_metadata(payload['graph'], payload['public'],
+                             payload['metadata'])
+
+    def rename_outport(self, payload):
+        """
+        Rename outport
+        """
+        self._rename_outport(payload['graph'], payload['from'], payload['to'])
+
+    def add_group(self, payload):
+        """
+        Add group to graph
+        """
+        self._add_group(
+            payload['graph'],
+            payload['name'],
+            payload['nodes'],
+            payload.get('metadata', None)
+        )
+
+    def remove_group(self, payload):
+        """
+        Remove group from graph
+        """
+        self._remove_group(
+            payload['graph'],
+            payload['name']
+        )
+
+    def rename_group(self, payload):
+        """
+        Rename group
+        """
+        self._remove_group(
+            payload['graph'],
+            payload['from'],
+            payload['to']
+        )
+
+    def change_group(self, payload):
+        """
+        Rename group
+        """
+        self._remove_group(
+            payload['graph'],
+            payload['name'],
+            payload['nodes'],
+            payload.get('metadata', None)
+        )
 
     # -- implementation
 
-    def _new_graph(self, graph_id, description=None, metadata=None,
-                   overwrite=True):
+    def _get_graph(self, graph_id):
+        """
+        Parameters
+        ----------
+        graph_id : str
+            unique identifier for the graph to create or get
+
+        Returns
+        -------
+        graph : ``rill.engine.network.Graph``
+            the graph object.
+        """
+        try:
+            return self._graphs[graph_id]
+        except KeyError:
+            raise FlowError('Requested graph not found')
+
+    def _new_graph(self, graph_id):
         """
         Create a new graph.
         """
-        if not overwrite and self._graphs.get(graph_id, None):
-            raise FlowError('Graph already exists')
-
         self.logger.debug('Graph {}: Initializing'.format(graph_id))
-        self.add_graph(graph_id, Graph(
-            name=graph_id,
-            description=description,
-            metadata=metadata
-        ))
+        # FIXME: set graph name to graph_id?
+        graph = Graph(graph_id)
+        self.add_graph(graph_id, graph)
+        return graph
+
+    def _add_graph(self, graph_id, graph):
+        """
+        Parameters
+        ----------
+        graph_id : str
+        graph : ``rill.engine.network.Graph``
+        """
+        self._graphs[graph_id] = graph
 
     def _set_graph_metadata(self, graph_id, metadata):
         """
@@ -296,59 +278,58 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         graph.set_metadata(metadata)
         return metadata
 
-    def _rename_graph(self, from_name, to_name):
+    def _rename_graph(self, from_id, to_id):
         """
         Parameters
         ----------
-        from_name : str
-        to_name : str
+        from_id : str
+        to_id : str
         """
-        graph = self.get_graph(from_name)
-        graph.rename(to_name)
+        graph = self.get_graph(from_id)
+        graph.rename(to_id)
 
-        # FIXME: graph id and name should not be the same thing
-        del self._graphs[from_name]
-        self._graphs[to_name] = graph
+        del self._graphs[from_id]
+        self._graphs[to_id] = graph
 
         return graph
 
-    def _add_node(self, graph_id, node, component, metadata=None):
+    def _add_node(self, graph_id, node_id, component_id, metadata=None):
         """
         Add a component instance.
         """
         self.logger.debug('Graph {}: Adding node {}({})'.format(
-            graph_id, component, node))
+            graph_id, component_id, node_id))
 
         graph = self.get_graph(graph_id)
 
-        component_class = self._component_types[component]['class']
-        component = graph.add_component(node, component_class)
+        component_class = self._component_types[component_id]['class']
+        component = graph.add_component(node_id, component_class)
         component.metadata.update(metadata or {})
         return component
 
-    def _remove_node(self, graph_id, node):
+    def _remove_node(self, graph_id, node_id):
         """
         Destroy component instance.
         """
         self.logger.debug('Graph {}: Removing node {}'.format(
-            graph_id, node))
+            graph_id, node_id))
 
         graph = self.get_graph(graph_id)
-        graph.remove_component(node)
+        graph.remove_component(node_id)
 
-    def _rename_node(self, graph_id, from_name, to_name):
+    def _rename_node(self, graph_id, orig_node_id, new_node_id):
         """
         Rename component instance.
         """
         self.logger.debug('Graph {}: Renaming node {} to {}'.format(
-            graph_id, from_name, to_name))
+            graph_id, orig_node_id, new_node_id))
 
         graph = self.get_graph(graph_id)
-        graph.rename_component(from_name, to_name)
+        graph.rename_component(orig_node_id, new_node_id)
 
-    def _set_node_metadata(self, graph_id, node, metadata):
+    def _set_node_metadata(self, graph_id, node_id, metadata=None):
         graph = self.get_graph(graph_id)
-        component = graph.component(node)
+        component = graph.component(node_id)
         graph.set_node_metadata(component, metadata)
         return component.metadata
 
@@ -375,7 +356,7 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         graph.disconnect(self._get_port(graph, src, kind='out'),
                          self._get_port(graph, tgt, kind='in'))
 
-    def _set_edge_metadata(self, graph_id, src, tgt, metadata):
+    def _set_edge_metadata(self, graph_id, src, tgt, metadata=None):
         """
         Set metadata on edge
         """
@@ -473,7 +454,7 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         graph = self.get_graph(graph_id)
         graph.rename_outport(from_name, to_name)
 
-    def _add_group(self, graph_id, name, nodes, metadata=None):
+    def _add_group(self, graph_id, name, nodes, metadata):
         """
         Add group to graph
         """
@@ -500,5 +481,4 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         """
         graph = self.get_graph(graph_id)
         graph.change_group(name, nodes, metadata)
-
 

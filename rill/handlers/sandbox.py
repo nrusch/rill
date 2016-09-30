@@ -1,11 +1,11 @@
 import subprocess
 import sys
-from rill.events.dispatchers.base import GraphDispatcher
+from rill.handlers.base import GraphHandler
 from rill.engine.exceptions import FlowError
 from rill.compat import *
 
 
-class SandboxedGraphDispatcher(GraphDispatcher):
+class SandboxedGraphHandler(GraphHandler):
 
     # FIXME: there are a couple of approaches to get responses back from the subprocess
     # - have it send messages back to us, and then we forward it to a
@@ -17,7 +17,7 @@ class SandboxedGraphDispatcher(GraphDispatcher):
     # to be capable of doing more, such as tracking the revision. it also means
     # the revision has to be per-graph, instead of global, which gets complicated
     def __init__(self, dispatcher):
-        super(SandboxedGraphDispatcher, self).__init__(dispatcher)
+        super(SandboxedGraphHandler, self).__init__(dispatcher)
         self._graphs = {}
 
     def _forward(self, msg):
@@ -67,144 +67,6 @@ class SandboxedGraphDispatcher(GraphDispatcher):
             'socket': socket
         }
 
-    #
-    # def set_graph_metadata(self, msg):
-    #     """
-    #     Set Graph Metadata
-    #     """
-    #     self._forward(msg)
-    #
-    # def rename_graph(self, msg):
-    #     """
-    #     Rename Graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def add_node(self, msg):
-    #     """
-    #     Add a component instance.
-    #     """
-    #     self._forward(msg)
-    #
-    # def remove_node(self, msg):
-    #     """
-    #     Destroy component instance.
-    #     """
-    #     self._forward(msg)
-    #
-    # def rename_node(self, msg):
-    #     """
-    #     Rename component instance.
-    #     """
-    #     self._forward(msg)
-    #
-    # def set_node_metadata(self, msg):
-    #     """
-    #     Sends changenode event
-    #     """
-    #     self._forward(msg)
-    #
-    # def add_edge(self, msg):
-    #     """
-    #     Connect ports between components.
-    #     """
-    #     self._forward(msg)
-    #
-    # def remove_edge(self, msg):
-    #     """
-    #     Disconnect ports between components.
-    #     """
-    #     self._forward(msg)
-    #
-    # def set_edge_metadata(self, msg):
-    #     """
-    #     Send changeedge event'
-    #     """
-    #     self._forward(msg)
-    #
-    # def initialize_port(self, msg):
-    #     """
-    #     Set the inital packet for a component inport.
-    #     """
-    #     self._forward(msg)
-    #
-    # def uninitialize_port(self, msg):
-    #     """
-    #     Remove the initial packet for a component inport.
-    #     """
-    #     self._forward(msg)
-    #
-    # def add_inport(self, msg):
-    #     """
-    #     Add inport to graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def remove_inport(self, msg):
-    #     """
-    #     Remove inport from graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def set_inport_metadata(self, msg):
-    #     """
-    #     Send the metadata on an exported inport
-    #     """
-    #     self._forward(msg)
-    #
-    # def rename_inport(self, msg):
-    #     """
-    #     Rename inport
-    #     """
-    #     self._forward(msg)
-    #
-    # def add_outport(self, msg):
-    #     """
-    #     Add outport to graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def remove_outport(self, msg):
-    #     """
-    #     Remove outport from graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def set_outport_metadata(self, msg):
-    #     """
-    #     Send the metadata on an exported outport
-    #     """
-    #     self._forward(msg)
-    #
-    # def rename_outport(self, msg):
-    #     """
-    #     Rename outport
-    #     """
-    #     self._forward(msg)
-    #
-    # def add_group(self, msg):
-    #     """
-    #     Add group to graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def remove_group(self, msg):
-    #     """
-    #     Remove group from graph
-    #     """
-    #     self._forward(msg)
-    #
-    # def rename_group(self, msg):
-    #     """
-    #     Rename group
-    #     """
-    #     self._forward(msg)
-    #
-    # def change_group(self, msg):
-    #     """
-    #     Change group
-    #     """
-    #     self._forward(msg)
 
 if __name__ == '__main__':
     import gevent

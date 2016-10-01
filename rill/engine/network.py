@@ -8,7 +8,7 @@ from inspect import isclass
 import time
 import copy
 
-from typing import Dict, Union, Tuple, Any, Optional
+from typing import Dict, Union, Tuple, Any, Optional, Iterable
 
 from rill.engine.exceptions import FlowError, NetworkDeadlock
 from rill.engine.runner import ComponentRunner
@@ -234,9 +234,9 @@ class Graph(object):
         ----------
         graph : ``Graph``
             graph to add
-        bases : ``SubGraph`` | Iterable[``SubGraph``]
+        bases : Union[``SubGraph``, Iterable[``SubGraph``]]
             Base classes to be used when constructing a SubGraph class.
-        name : str | None
+        name : Optional[str]
             name of component within the graph
 
         Returns

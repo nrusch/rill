@@ -3,7 +3,7 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 
-from typing import Any, List, Iterable
+from typing import Any, List, Iterator
 
 from rill.engine.port import (PortCollection, flatten_arrays, is_null_port,
                               IN_NULL, OUT_NULL)
@@ -231,7 +231,7 @@ class Component(object):
 
         Returns
         -------
-        Iterable[``rill.engine.inputport.InputPort``]
+        Iterator[``rill.engine.inputport.InputPort``]
         """
         for port in flatten_arrays(self.ports):
             if port.kind == 'in':
@@ -244,7 +244,7 @@ class Component(object):
 
         Returns
         -------
-        Iterable[``rill.engine.inputport.OutputPort``]
+        Iterator[``rill.engine.inputport.OutputPort``]
         """
         for port in flatten_arrays(self.ports):
             if port.kind == 'out':

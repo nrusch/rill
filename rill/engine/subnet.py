@@ -382,9 +382,9 @@ def make_subgraph(graph, bases=None, name=None):
     Parameters
     ----------
     graph : ``rill.engine.network.Graph``
-    bases : ``SubGraph`` | Iterable[``SubGraph``]
+    bases : Union[``SubGraph``, Iterable[``SubGraph``]
         Base classes to be used when constructing a SubGraph class.
-    name : str | None
+    name : Optional[str]
         If None, `graph.name` will be used. If that is also None, a ValueError
         exception will be raised.
 

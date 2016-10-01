@@ -1,6 +1,8 @@
 from abc import ABCMeta, abstractmethod
 from rill.compat import *
 
+from typing import Iterator
+
 
 @add_metaclass(ABCMeta)
 class GraphHandler(object):
@@ -28,7 +30,7 @@ class GraphHandler(object):
         """
 
     @abstractmethod
-    def get_graph(self, graph_id):
+    def get_graph_messages(self, graph_id):
         """
         Parameters
         ----------
@@ -37,6 +39,5 @@ class GraphHandler(object):
 
         Returns
         -------
-        graph : ``rill.engine.network.Graph``
-            the graph object.
+        Iterator[rill.plumbing.Message]
         """

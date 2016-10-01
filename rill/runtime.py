@@ -502,7 +502,8 @@ class Runtime(object):
         Parameters
         ----------
         graph_id : str
-            unique identifier for the graph to create or get
+            unique identifier for the graph
+
         Returns
         -------
         graph : ``rill.engine.network.Graph``
@@ -676,7 +677,7 @@ class Runtime(object):
             # message is when noflo initializes the inport to [] (see initialize_port as well)
             return graph.uninitialize(target_port)._content
 
-    def add_export(self, graph_id, node, port, public, metadata={}):
+    def add_export(self, graph_id, node, port, public, metadata=None):
         """
         Add inport or outport to graph
         """
@@ -730,11 +731,10 @@ class Runtime(object):
         graph.rename_outport(from_name, to_name)
         self.update_graph_component(graph)
 
-    def change_graph(self, graph_id, description=None, metadata={}):
+    def change_graph(self, graph_id, description=None, metadata=None):
         """
         Change graph attributes
         """
-
         graph = self.get_graph(graph_id)
 
         if description:
@@ -754,7 +754,7 @@ class Runtime(object):
         del self._graphs[old_id]
         self._graphs[new_id] = graph
 
-    def add_group(self, graph_id, name, nodes, metadata={}):
+    def add_group(self, graph_id, name, nodes, metadata=None):
         """
         Add group to graph
         """
@@ -781,6 +781,7 @@ class Runtime(object):
         """
         graph = self.get_graph(graph_id)
         return graph.change_group(name, nodes, metadata)
+
 
 # FIXME: do we need the host?
 def serve_runtime(runtime=None, host=DEFAULTS['host'], port=DEFAULTS['port'],

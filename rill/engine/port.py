@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict, Counter
 
-from typing import Any, Union, Iterable, List
+from typing import Any, Union, Iterator, List
 
 from rill.engine.portdef import IN_NULL, OUT_NULL
 from rill.engine.exceptions import FlowError, PacketValidationError
@@ -243,7 +243,7 @@ class PortContainerMixin(object):
 
         Returns
         -------
-        Iterable[Union[``rill.engine.inputport.InputPort``, ``rill.engine.outputport.OutputPort``]]
+        Iterator[Union[``rill.engine.inputport.InputPort``, ``rill.engine.outputport.OutputPort``]]
         """
         raise NotImplementedError
 
@@ -299,7 +299,7 @@ class ArrayPort(BasePort, PortContainerMixin):
 
         Returns
         -------
-        Iterable[Union[``rill.engine.inputport.InputPort``, ``rill.engine.outputport.OutputPort``]]
+        Iterator[Union[``rill.engine.inputport.InputPort``, ``rill.engine.outputport.OutputPort``]]
         """
         for index in sorted(self._elements.keys()):
             yield self._elements[index]
@@ -455,7 +455,7 @@ class BasePortCollection(PortContainerMixin):
 
         Returns
         -------
-        Iterable[Union[``rill.engine.inputport.InputPort``, ``rill.engine.outputport.OutputPort``]]
+        Iterator[Union[``rill.engine.inputport.InputPort``, ``rill.engine.outputport.OutputPort``]]
         """
         for port in self._ports.values():
             yield port

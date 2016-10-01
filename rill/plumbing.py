@@ -9,6 +9,8 @@ import copy
 import uuid
 import traceback
 
+from typing import Iterator
+
 import gevent
 import zmq.green as zmq
 from zmq.green.eventloop.ioloop import IOLoop, PeriodicCallback
@@ -93,7 +95,7 @@ class RuntimeComponentLogHandler(logging.Handler):
         ----------
         record : logging.LogRecord
         """
-        self.runtime_handler.send_log_record(record)
+        self.runtime_handler._send_log_record(record)
 
 
 class Message(object):
@@ -539,12 +541,35 @@ class RuntimeHandler(object):
         self.logger = logging.getLogger('{}.{}'.format(
             self.__class__.__module__, self.__class__.__name__))
 
-        self.runtime.port_opened.event.listen(self.send_port_opened)
-        self.runtime.port_closed.event.listen(self.send_port_closed)
+        self.runtime.port_opened.event.listen(self._send_port_opened)
+        self.runtime.port_closed.event.listen(self._send_port_closed)
 
         self.dispatcher = dispatcher
 
-    def send_log_record(self, record):
+    def get_graph_messages(self, graph_id):
+        """
+        Parameters
+        ----------
+        graph_id : str
+
+        Returns
+        -------
+        Iterator[Message]
+        """
+        for command, payload in get_graph_messages(
+                self.runtime.get_graph(graph_id), graph_id):
+            yield Message(b'graph', command, payload)
+
+    def get_all_component_specs(self):
+        """
+        Returns
+        -------
+        Iterator[Message]
+        """
+        for spec in self.runtime.get_all_component_specs():
+            yield Message(b'component', b'component', spec)
+
+    def _send_log_record(self, record):
         """
         Parameters
         ----------
@@ -593,88 +618,6 @@ class RuntimeHandler(object):
         except (FlowError, RillRuntimeError) as err:
             self.dispatcher.send_error(msg, err)
 
-    # Utilities --
-
-    # def send(self, protocol, command, payload, message_id=None):
-    #     """
-    #     Send a message to UI/client
-    #     """
-    #     message = {'protocol': protocol,
-    #                'command': command,
-    #                'payload': payload,
-    #                'id': message_id or str(uuid.uuid4())}
-    #     print("--OUT--")
-    #     import pprint
-    #     pprint.pprint(message)
-    #     # FIXME: what do we do when the socket closes or is dead?
-    #     try:
-    #         self.ws.send(json.dumps(message))
-    #     except geventwebsocket.WebSocketError as err:
-    #         print(err)
-    #
-    # def send_error(self, protocol, message):
-    #     data = {
-    #         'message': message,
-    #         'stack': traceback.format_exc()
-    #     }
-    #     self.send(protocol, 'error', data)
-
-    # Protocol send/responses --
-
-    # def handle_runtime(self, command, payload, message_id):
-    #     # tell UI info about runtime and supported capabilities
-    #     if command == 'getruntime':
-    #         payload = self.runtime.get_runtime_meta()
-    #         # self.logger.debug(json.dumps(payload, indent=4))
-    #         self.send('runtime', 'runtime', payload)
-    #
-    #     # network:packet, allows sending data in/out to networks in this
-    #     # runtime can be used to represent the runtime as a FBP component
-    #     # in bigger system "remote subgraph"
-    #     elif command == 'packet':
-    #         # We don't actually run anything, just echo input back and
-    #         # pretend it came from "out"
-    #         payload['port'] = 'out'
-    #         self.send('runtime', 'packet', payload)
-    #
-    #     else:
-    #         self.logger.warn("Unknown command '%s' for protocol '%s' " %
-    #                          (command, 'runtime'))
-
-    # def handle_component(self, command, payload, message_id):
-    #     """
-    #     Provide information about components.
-    #     Parameters
-    #     ----------
-    #     command : str
-    #     payload : dict
-    #     """
-    #     if command == 'list':
-    #         for spec in self.runtime.get_all_component_specs():
-    #             self.send('component', 'component', spec)
-    #
-    #         self.send('component', 'componentsready', None)
-    #     # Get source code for component
-    #     elif command == 'getsource':
-    #         raise TypeError("HEREREREREHRERERE")
-    #         component_name = payload['name']
-    #         source_code = self.runtime.get_source_code(component_name)
-    #
-    #         library_name, short_component_name = component_name.split('/', 1)
-    #
-    #         payload = {
-    #             'name': short_component_name,
-    #             'language': 'python',
-    #             'library': library_name,
-    #             'code': source_code,
-    #             #'tests': ''
-    #             'secret': payload.get('secret')
-    #         }
-    #         self.send('component', 'source', payload)
-    #     else:
-    #         self.logger.warn("Unknown command '%s' for protocol '%s' " %
-    #                          (command, 'component'))
-
     def handle_graph(self, msg):
         """
         Modify our graph representation to match that of the UI/client
@@ -688,21 +631,10 @@ class RuntimeHandler(object):
 
         def get_graph():
             try:
-                if command in ['clear', 'addgraph']:
-                    return payload['id']
-                else:
-                    return payload['graph']
+                return payload['graph']
 
             except KeyError:
                 raise FlowError('No graph specified')
-
-        # def update_subnet(graph_id):
-        #     spec = self.runtime.register_subnet(graph_id)
-        #     self.send(
-        #         'component',
-        #         'component',
-        #         spec
-        #     )
 
         # New graph
         send_component = False
@@ -710,136 +642,136 @@ class RuntimeHandler(object):
             self.runtime.new_graph(
                 payload['id'],
                 payload.get('description', None),
-                payload.get('metadata', None)
-            )
-        if command == 'addgraph':
+                payload.get('metadata', None))
+        elif command == 'addgraph':
             send_component = True
             self.runtime.new_graph(
                 payload['id'],
                 payload.get('description', None),
                 payload.get('metadata', None),
-                overwrite=False
-            )
+                overwrite=False)
         # Nodes
         elif command == 'addnode':
-            self.runtime.add_node(get_graph(), payload['id'],
-                                  payload['component'],
-                                  payload.get('metadata', {}))
+            self.runtime.add_node(
+                get_graph(),
+                payload['id'],
+                payload['component'],
+                payload.get('metadata', None))
         elif command == 'removenode':
-            self.runtime.remove_node(get_graph(), payload['id'])
+            self.runtime.remove_node(
+                get_graph(),
+                payload['id'])
         elif command == 'renamenode':
-            self.runtime.rename_node(get_graph(), payload['from'],
-                                     payload['to'])
+            self.runtime.rename_node(
+                get_graph(),
+                payload['from'],
+                payload['to'])
         # Edges/connections
         elif command == 'addedge':
-            self.runtime.add_edge(get_graph(), payload['src'],
-                                             payload['tgt'],
-                                             payload.get('metadata', {}))
+            self.runtime.add_edge(
+                get_graph(),
+                payload['src'],
+                payload['tgt'],
+                payload.get('metadata', None))
         elif command == 'removeedge':
-            self.runtime.remove_edge(get_graph(), payload['src'],
-                                     payload['tgt'])
+            self.runtime.remove_edge(
+                get_graph(),
+                payload['src'],
+                payload['tgt'])
         # IIP / literals
         elif command == 'addinitial':
-            self.runtime.initialize_port(get_graph(), payload['tgt'],
-                                         payload['src']['data'])
+            self.runtime.initialize_port(
+                get_graph(),
+                payload['tgt'],
+                payload['src']['data'])
         elif command == 'removeinitial':
-            self.runtime.uninitialize_port(get_graph(),
-                                                 payload['tgt'])
+            self.runtime.uninitialize_port(
+                get_graph(),
+                payload['tgt'])
         # Exported ports
         elif command in ('addinport', 'addoutport'):
             send_component = True
-            self.runtime.add_export(get_graph(), payload['node'],
-                                    payload['port'], payload['public'],
-                                    payload['metadata'])
+            self.runtime.add_export(
+                get_graph(),
+                payload['node'],
+                payload['port'],
+                payload['public'],
+                payload.get('metadata', None))
             # update_subnet(get_graph())
         elif command == 'removeinport':
             send_component = True
-            self.runtime.remove_inport(get_graph(), payload['public'])
-            # update_subnet(get_graph())
+            self.runtime.remove_inport(
+                get_graph(),
+                payload['public'])
         elif command == 'removeoutport':
             send_component = True
-            self.runtime.remove_outport(get_graph(), payload['public'])
-            # update_subnet(get_graph())
+            self.runtime.remove_outport(
+                get_graph(),
+                payload['public'])
         elif command == 'changeinport':
             self.runtime.change_inport(
-                get_graph(), payload['public'], payload['metadata'])
+                get_graph(),
+                payload['public'],
+                payload['metadata'])
         elif command == 'changeoutport':
             self.runtime.change_outport(
-                get_graph(), payload['public'], payload['metadata'])
+                get_graph(),
+                payload['public'],
+                payload['metadata'])
         elif command == 'renameinport':
             send_component = True
             self.runtime.rename_inport(
-                get_graph(), payload['from'], payload['to'])
+                get_graph(),
+                payload['from'],
+                payload['to'])
         elif command == 'renameoutport':
             send_component = True
             self.runtime.rename_outport(
-                get_graph(), payload['from'], payload['to'])
+                get_graph(),
+                payload['from'],
+                payload['to'])
         # Metadata changes
         elif command == 'changenode':
-            self.runtime.set_node_metadata(get_graph(),
-                                           payload['id'],
-                                           payload['metadata'])
+            self.runtime.set_node_metadata(
+                get_graph(),
+                payload['id'],
+                payload['metadata'])
         elif command == 'changeedge':
-            self.runtime.set_edge_metadata(get_graph(),
-                                           payload['src'],
-                                           payload['tgt'],
-                                           payload['metadata'])
+            self.runtime.set_edge_metadata(
+                get_graph(),
+                payload['src'],
+                payload['tgt'],
+                payload['metadata'])
         elif command == 'addgroup':
             self.runtime.add_group(
                 get_graph(),
                 payload['name'],
                 payload['nodes'],
-                payload.get('metadata', {})
-            )
+                payload.get('metadata', None))
         elif command == 'removegroup':
             self.runtime.remove_group(
                 get_graph(),
-                payload['name']
-            )
+                payload['name'])
         elif command == 'renamegroup':
             self.runtime.rename_group(
                 get_graph(),
                 payload['from'],
-                payload['to']
-            )
+                payload['to'])
         elif command == 'changegroup':
             self.runtime.change_group(
                 get_graph(),
                 payload['name'],
                 payload.get('nodes', None),
-                payload.get('metadata', {})
-            )
-
-        # elif command == 'getgraph':
-        #     send_ack = False
-        #     graph_id = payload['id']
-        #     try:
-        #         graph = self.runtime.get_graph(graph_id)
-        #         graph_messages = get_graph_messages(
-        #             graph, graph_id)
-        #         for command, payload in graph_messages:
-        #             self.send('graph', command, payload)
-        #     except FlowError as ex:
-        #         self.runtime.new_graph(graph_id)
-        #
-        # elif command == 'list':
-        #     send_ack = False
-        #     for graph_id in self.runtime._graphs.keys():
-        #         self.send('graph', 'graph', {
-        #             'id': graph_id
-        #         })
-        #
-        #     self.send('graph', 'graphsdone', None)
-
+                payload.get('metadata', None))
         elif command == 'changegraph':
             self.runtime.change_graph(
                 get_graph(),
                 payload.get('description', None),
-                payload.get('metadata', None)
-            )
-
+                payload.get('metadata', None))
         elif command == 'renamegraph':
-            self.runtime.rename_graph(payload['from'], payload['to'])
+            self.runtime.rename_graph(
+                payload['from'],
+                payload['to'])
 
         else:
             self.logger.warn("Unknown command '%s' for protocol '%s'" %
@@ -848,6 +780,7 @@ class RuntimeHandler(object):
             return
 
         self.dispatcher.send_revision(msg)
+
         if send_component:
             self.dispatcher.send_info(
                 protocol=b'component',
@@ -865,12 +798,12 @@ class RuntimeHandler(object):
             # 'debug': True,
         }
 
-    def send_network_status(self, msg, command):
+    def _send_network_status(self, msg, command):
         status = self.get_network_status(msg.graph_id)
         self.dispatcher.send_revision(msg.replace(command=command,
                                                   payload=status))
 
-    def send_network_data(self, connection, outport, inport, packet):
+    def _send_network_data(self, connection, outport, inport, packet):
         edge_id = '{}.{}{} -> {}.{}{}'.format(
             outport.component.name, outport.name,
             '[{}]'.format(outport.index) if outport.index else '',
@@ -895,7 +828,7 @@ class RuntimeHandler(object):
                 'graph': inport.component.network.graph.name
             })
 
-    def send_port_opened(self, graph, component, port):
+    def _send_port_opened(self, graph, component, port):
         self.dispatcher.send_info(
             protocol=b'network',
             command=b'portopen',
@@ -907,8 +840,8 @@ class RuntimeHandler(object):
                 'type': 'inport' if port.kind == 'in' else 'outport'
             })
 
-    def send_port_closed(self, graph, component, port):
-        self.send_info(
+    def _send_port_closed(self, graph, component, port):
+        self.dispatcher.send_info(
             protocol=b'network',
             command=b'portclosed',
             payload={
@@ -935,11 +868,14 @@ class RuntimeHandler(object):
         # if command == 'getstatus':
         #     send_status('status', graph_id, timestamp=False)
         if command == 'start':
+            # pass a callback that is run when the graph completes
             callback = functools.partial(
-                self.send_network_status, msg, 'stopped')
+                self._send_network_status, msg, 'stopped')
             self.runtime.start(graph_id, callback)
             reply = 'started'
         elif command == 'stop':
+            # FIXME: instead of sending a stop message below, we should rely on
+            # the listener setup above to fire when the network stops
             self.runtime.stop(graph_id)
             reply = 'stopped'
         # elif command == 'debug':
@@ -951,7 +887,7 @@ class RuntimeHandler(object):
             # FIXME: quit? dump message?
             return
 
-        self.send_network_status(msg, reply)
+        self._send_network_status(msg, reply)
 
 
 class MessageDispatcher(object):
@@ -973,7 +909,7 @@ class MessageDispatcher(object):
 
     def send_info(self, protocol, command, payload):
         """
-        Tag a message with the current revision and send it on `self.publisher`
+        Create a message with the current revision and send it to all clients.
 
         Messages sent via `send_info` originate on the runtime.  They
         represent ephemeral data.
@@ -984,20 +920,18 @@ class MessageDispatcher(object):
             protocol=protocol,
             command=command,
             payload=payload,
-            revision=self.revision
-        )
+            revision=self.revision)
         msg.sendto(self.publish_socket)
 
     def send_revision(self, msg):
         """
-        Increment the revision, add it to the message, and send it on
-        `self.publisher`
+        Given a client message that has been successfully applied to the
+        runtime state, increment the revision, add it to the message, and
+        propagate it to all clients (including the originator of the
+        message).
 
         Messages sent via `send_revision` are expected to not have originated
         from a client, and represent a change of state.
-
-        This sends confirmation to all clients (including the originator of the
-        message) that the update was successfully committed on the server.
 
         Parameters
         ----------
@@ -1074,7 +1008,7 @@ class RuntimeServer(object):
         # Run reactor until process interrupted
         try:
             self.runtime.send_network_data.event.listen(
-                self.handler.send_network_data)
+                self.handler._send_network_data)
 
             self.loop.start()
 
@@ -1083,7 +1017,7 @@ class RuntimeServer(object):
 
     def stop(self):
         self.runtime.send_network_data.event.remove_listener(
-            self.handler.send_network_data)
+            self.handler._send_network_data)
 
         self.loop.stop()
 
@@ -1124,10 +1058,8 @@ class RuntimeServer(object):
                 print("Graph id: %s" % graph_id)
 
                 try:
-                    graph = self.runtime.get_graph(graph_id)
-                    for command, payload in get_graph_messages(graph, graph_id):
-                        Message(b'graph', command, payload).sendto(
-                            self.collector, msg.identity)
+                    for msg in self.handler.get_graph_messages(graph_id):
+                        msg.sendto(self.collector, msg.identity)
 
                     # send the network status
                     status = self.handler.get_network_status(graph_id)
@@ -1146,9 +1078,8 @@ class RuntimeServer(object):
 
                 # send list of component specs
                 # FIXME: move this under 'runtime' protocol?
-                for spec in self.runtime.get_all_component_specs():
-                    Message(b'component', b'component', spec).sendto(
-                        self.collector, msg.identity)
+                for msg in self.handler.get_all_component_specs():
+                    msg.sendto(self.collector, msg.identity)
 
                 # send list of graphs
                 # FIXME: move this under 'runtime' protocol?

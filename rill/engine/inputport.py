@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import deque
 
-from typing import Any, Union, Iterable, Tuple
+from typing import Any, Union, Iterator, Tuple
 
 from rill.engine.status import StatusValues
 from rill.engine.port import (Port, ArrayPort, BasePortCollection,
@@ -87,7 +87,7 @@ class InputInterface(PortInterface):
 
         Returns
         -------
-        Iterable[``rill.engine.packet.Packet``]
+        Iterator[``rill.engine.packet.Packet``]
         """
         while True:
             p = self.receive()
@@ -105,7 +105,7 @@ class InputInterface(PortInterface):
 
         Returns
         -------
-        Iterable[Any]
+        Iterator[Any]
         """
         for p in self.iter_packets():
             content = p.get_contents()
@@ -865,7 +865,7 @@ class SynchronizedInputCollection(BaseInputCollection):
 
         Returns
         -------
-        Iterable[Tuple[Any, ...]]
+        Iterator[Tuple[Any, ...]]
         """
         for group in self.iter_packets():
             yield tuple(p.drop() for p in group)

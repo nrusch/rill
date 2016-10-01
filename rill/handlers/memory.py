@@ -2,8 +2,10 @@ from rill.engine.network import Graph
 from rill.engine.types import Stream
 from rill.engine.exceptions import FlowError
 from rill.handlers.base import GraphHandler
+from rill.plumbing import Message
+from rill.events.listeners.memory import get_graph_messages
 
-from typing import Dict
+from typing import Dict, Iterator
 
 
 ARG_REPLACEMENTS = (
@@ -92,6 +94,20 @@ class InMemoryGraphHandler(GraphHandler):
 
             method = getattr(self, method_name)
             method(**_toargs(msg.payload))
+
+    def get_graph_messages(self, graph_id):
+        """
+        Parameters
+        ----------
+        graph_id : str
+
+        Returns
+        -------
+        Iterator[rill.plumbing.Message]
+        """
+        for command, payload in get_graph_messages(
+                self.runtime.get_graph(graph_id), graph_id):
+            yield Message(b'graph', command, payload)
 
     # -- utilities
 

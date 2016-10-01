@@ -2,7 +2,7 @@ from rill.events.listeners.base import GraphListener
 from rill.engine.types import serialize
 from rill.engine.inputport import InitializationConnection, InputPort
 
-from typing import List
+from typing import List, Iterator, Tuple
 
 
 def fbp_component(component, graph_id=None):
@@ -89,7 +89,7 @@ def get_graph_messages_old(graph, graph_id):
 
     Returns
     -------
-    Iterator[Dict[str, Any]]
+    Iterator[Tuple[str, Dict[str, Any]]]
         graph protocol messages that reproduce graph
     """
     # FIXME: reverse this: use get_graph_messages to produce Graph.to_dict().
@@ -153,7 +153,7 @@ def get_graph_messages(graph, graph_id):
 
     Returns
     -------
-    Iterator[Dict[str, Any]]
+    Iterator[Tuple[str, Dict[str, Any]]]
         graph protocol messages that reproduce graph
     """
 

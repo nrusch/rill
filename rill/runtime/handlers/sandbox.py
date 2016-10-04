@@ -1,6 +1,6 @@
 import subprocess
 import sys
-from rill.handlers.base import GraphHandler
+from rill.runtime.handlers.base import GraphHandler
 from rill.engine.exceptions import FlowError
 from rill.compat import *
 
@@ -32,7 +32,7 @@ class SandboxedGraphHandler(GraphHandler):
 
         Parameters
         ----------
-        msg: rill.plumbing.Message
+        msg: rill.runtime.plumbing.Message
         """
         assert msg.protocol in {'graph', 'network'}
 

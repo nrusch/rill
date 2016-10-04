@@ -2,8 +2,8 @@ from rill.engine.utils import patch
 patch()
 import gevent
 import argparse
-from rill.runtime import DEFAULTS, Runtime, serve_runtime
-from rill.server import websocket_application_task
+from rill.runtime.core import DEFAULTS, Runtime, serve_runtime
+from rill.runtime.websock import websocket_application_task
 
 
 def main():

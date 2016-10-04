@@ -16,7 +16,7 @@ class GraphHandler(object):
         """
         Parameters
         ----------
-        dispatcher : rill.plumbing.MessageDispatcher
+        dispatcher : rill.runtime.plumbing.MessageDispatcher
         """
         self.dispatcher = dispatcher
         self.logger = logging.getLogger('{}.{}'.format(
@@ -29,7 +29,7 @@ class GraphHandler(object):
 
         Parameters
         ----------
-        msg: rill.plumbing.Message
+        msg: rill.runtime.plumbing.Message
         """
 
     @abstractmethod
@@ -42,5 +42,5 @@ class GraphHandler(object):
 
         Returns
         -------
-        Iterator[rill.plumbing.Message]
+        Iterator[rill.runtime.plumbing.Message]
         """

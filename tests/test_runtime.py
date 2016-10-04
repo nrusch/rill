@@ -2,12 +2,12 @@ import pytest
 import uuid
 
 from rill.engine.runner import ComponentRunner
-from rill.runtime import Runtime
+from rill.runtime.core import Runtime
 from rill.events.listeners.memory import get_graph_messages
 from rill.engine.network import Graph
-from rill.plumbing import Message, MessageDispatcher
+from rill.runtime.plumbing import Message, MessageDispatcher
 
-from rill.handlers.runtime import RuntimeHandler
+from rill.runtime.handlers.runtime import RuntimeHandler
 
 from mock import MagicMock, call
 from tests.components import *
@@ -41,8 +41,7 @@ def get_graph(graph_name):
 def _iter_client_messages():
     graph = get_graph("My Graph")[0]
     for command, payload in get_graph_messages(graph, GRAPH_ID):
-        msg = Message('graph', command, payload,
-                      id=b'xxx')
+        msg = Message('graph', command, payload, id=uuid.uuid1())
         msg.identity = 'foo'
         yield msg
 

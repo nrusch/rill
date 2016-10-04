@@ -9,7 +9,7 @@ import gevent
 from rill.engine.component import Component
 from rill.engine.network import Graph, Network, merge_metadata
 from rill.engine.subnet import SubGraph, make_subgraph
-from rill.engine.types import FBP_TYPES, Stream
+from rill.engine.types import Stream
 from rill.engine.exceptions import FlowError
 from rill.compat import *
 from rill.utils.observer import supports_listeners
@@ -553,7 +553,7 @@ class Runtime(object):
                                recursive=False, register=False)
                 self.register_component(subgraph_type, overwrite=True)
 
-    def add_node(self, graph_id, node_id, component_id, metadata):
+    def add_node(self, graph_id, node_id, component_id, metadata=None):
         """
         Add a component instance.
         """
@@ -564,7 +564,7 @@ class Runtime(object):
 
         component_class = self._component_types[component_id]['class']
         component = graph.add_component(node_id, component_class)
-        component.metadata.update(metadata)
+        merge_metadata(metadata, component.metadata)
 
     def remove_node(self, graph_id, node_id):
         """
@@ -778,6 +778,6 @@ class Runtime(object):
 def serve_runtime(runtime=None):
 
     runtime = runtime if runtime is not None else Runtime()
-    from rill.plumbing import RuntimeServer
+    from rill.runtime.plumbing import RuntimeServer
     server = RuntimeServer(runtime)
     server.start()

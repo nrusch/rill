@@ -8,16 +8,14 @@ import logging
 import gevent
 import geventwebsocket
 
-from rill.plumbing import RuntimeClient, Message
-from rill.runtime import DEFAULTS
+from rill.runtime.plumbing import RuntimeClient, Message
+from rill.runtime.core import DEFAULTS
 
 
 class WebSocketRuntimeApplication(geventwebsocket.WebSocketApplication):
     """
-    Web socket application that hosts a single ``Runtime`` instance.
-    An instance of this class receives messages over a websocket, delegates
-    message payloads to the appropriate ``Runtime`` methods, and sends
-    responses where applicable.
+    Web socket application acts as a bridge to the ZMQ-based RuntimeServer.
+
     Message structures are defined by the FBP Protocol.
     """
 
@@ -102,4 +100,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -5,10 +5,10 @@ import logging
 
 from typing import Iterator
 
-from rill.plumbing import Message
+from rill.runtime.plumbing import Message
 from rill.engine.exceptions import FlowError
 from rill.events.listeners.memory import get_graph_messages
-from rill.handlers.base import GraphHandler
+from rill.runtime.handlers.base import GraphHandler
 
 
 class RuntimeComponentLogHandler(logging.Handler):
@@ -40,7 +40,7 @@ class RuntimeHandler(GraphHandler):
     """
     def __init__(self, dispatcher, runtime=None):
         from rill.engine.component import _logger
-        from rill.runtime import Runtime
+        from rill.runtime.core import Runtime
         _logger.addHandler(RuntimeComponentLogHandler(self))
 
         super(RuntimeHandler, self).__init__(dispatcher)
@@ -80,7 +80,7 @@ class RuntimeHandler(GraphHandler):
         ----------
         msg : Message
         """
-        from rill.runtime import RillRuntimeError
+        from rill.runtime.core import RillRuntimeError
 
         dispatch = {
             # 'runtime': self.handle_runtime,
@@ -119,7 +119,10 @@ class RuntimeHandler(GraphHandler):
 
         def get_graph():
             try:
-                return payload['graph']
+                if command in {'clear', 'addgraph'}:
+                    return payload['id']
+                else:
+                    return payload['graph']
 
             except KeyError:
                 raise FlowError('No graph specified')
@@ -128,13 +131,13 @@ class RuntimeHandler(GraphHandler):
         send_component = False
         if command == 'clear':
             self.runtime.new_graph(
-                payload['id'],
+                get_graph(),
                 payload.get('description', None),
                 payload.get('metadata', None))
         elif command == 'addgraph':
             send_component = True
             self.runtime.new_graph(
-                payload['id'],
+                get_graph(),
                 payload.get('description', None),
                 payload.get('metadata', None),
                 overwrite=False)

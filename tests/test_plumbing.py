@@ -10,9 +10,11 @@ patch()
 import gevent
 
 from mock import MagicMock, patch
-import rill.plumbing as plumbing
-from rill.plumbing import RuntimeClient, RuntimeServer, Message
-from rill.runtime import Runtime
+import rill.runtime.plumbing as plumbing
+from rill.runtime.plumbing import Message
+from rill.runtime.client import RuntimeClient
+from rill.runtime.server import RuntimeServer
+from rill.runtime.core import Runtime
 
 import zmq.green as zmq
 import zmq.green.eventloop.zmqstream as zmqstream
@@ -34,10 +36,10 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
             'id': 'testgraph',
             'name': 'testgraph'
         },
-        id=uuid.uuid1()
+        id=uuid.uuid1(),
+        identity=b''
     )
-
-    server.handle_collect(test_graph, '')
+    server.handle_collect(test_graph)
     server.publisher.send_multipart.assert_called()
 
     result = Message.from_frames(
@@ -48,6 +50,7 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
     assert result.payload['id'] == 'testgraph'
     assert runtime._graphs['testgraph']
 
+    print server.publisher.send_multipart.call_args_list
     component_result = Message.from_frames(
         *server.publisher.send_multipart.call_args_list[1][0][0])
 
@@ -58,9 +61,14 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
     server.collector.send_multipart.reset_mock()
 
     snapshot_message = Message(
-        'internal', 'startsync', 'testgraph', uuid.uuid1())
+        protocol='internal',
+        command='startsync',
+        payload='testgraph',
+        id=uuid.uuid1(),
+        identity=b''
+    )
 
-    server.handle_snapshot(snapshot_message, '')
+    server.handle_snapshot(snapshot_message)
 
     clear_message = Message.from_frames(
         *server.collector.send_multipart.call_args_list[0][0][0])
@@ -78,8 +86,8 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
     assert status_message.protocol == 'network'
     assert status_message.command == 'status'
     assert status_message.payload['graph'] == 'testgraph'
-    assert status_message.payload['running'] == False
-    assert status_message.payload['started'] == False
+    assert status_message.payload['running'] is False
+    assert status_message.payload['started'] is False
 
     server.publisher.send_multipart.reset_mock()
     server.collector.send_multipart.reset_mock()
@@ -92,10 +100,11 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
             'id': 'node1',
             'component': 'tests.components/GenerateArray'
         },
-        id=uuid.uuid1()
+        id=uuid.uuid1(),
+        identity=b''
     )
 
-    server.handle_collect(genarray, '')
+    server.handle_collect(genarray)
     server.publisher.send_multipart.assert_called()
     genarray_result = Message.from_frames(
         *server.publisher.send_multipart.call_args[0][0])
@@ -115,10 +124,11 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
             'id': 'node2',
             'component': 'tests.components/Repeat'
         },
-        id=uuid.uuid1()
+        id=uuid.uuid1(),
+        identity=b''
     )
 
-    server.handle_collect(repeat, '')
+    server.handle_collect(repeat)
     server.publisher.send_multipart.assert_called()
     repeat_result = Message.from_frames(
         *server.publisher.send_multipart.call_args[0][0])
@@ -144,10 +154,11 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
                 'port': 'in'
             }
         },
-        id=uuid.uuid1()
+        id=uuid.uuid1(),
+        identity=b''
     )
 
-    server.handle_collect(edge, '')
+    server.handle_collect(edge)
     server.publisher.send_multipart.assert_called()
     edge_result = Message.from_frames(
         *server.publisher.send_multipart.call_args[0][0])

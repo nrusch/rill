@@ -22,7 +22,7 @@ def create_routes(host, port):
         """
         Get data about rill runtime
         """
-        from rill.runtime import Runtime
+        from rill.runtime.core import Runtime
 
         response.set_header('Access-Control-Allow-Origin', '*')
         response.set_header('Access-Control-Allow-Methods', 'GET, OPTIONS')

@@ -1,8 +1,8 @@
 from rill.engine.network import Graph
 from rill.engine.types import Stream
 from rill.engine.exceptions import FlowError
-from rill.handlers.base import GraphHandler
-from rill.plumbing import Message
+from rill.runtime.handlers.base import GraphHandler
+from rill.runtime.plumbing import Message
 from rill.events.listeners.memory import get_graph_messages
 
 from typing import Dict, Iterator
@@ -77,7 +77,7 @@ class InMemoryGraphHandler(GraphHandler):
 
         Parameters
         ----------
-        msg: rill.plumbing.Message
+        msg: rill.runtime.plumbing.Message
         """
         if msg.protocol == 'graph' and msg.command == 'clear':
             payload = msg.payload.copy()
@@ -106,7 +106,7 @@ class InMemoryGraphHandler(GraphHandler):
 
         Returns
         -------
-        Iterator[rill.plumbing.Message]
+        Iterator[rill.runtime.plumbing.Message]
         """
         for command, payload in get_graph_messages(
                 self.runtime.get_graph(graph_id), graph_id):

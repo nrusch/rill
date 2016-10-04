@@ -50,7 +50,6 @@ def test_runtime_server(Context, ZMQStream, is_socket_type):
     assert result.payload['id'] == 'testgraph'
     assert runtime._graphs['testgraph']
 
-    print server.publisher.send_multipart.call_args_list
     component_result = Message.from_frames(
         *server.publisher.send_multipart.call_args_list[1][0][0])
 

@@ -4,7 +4,6 @@ from abc import ABCMeta, abstractmethod
 import inspect
 import collections
 from collections import defaultdict
-from types import NoneType
 
 import schematics.types
 import schematics.models

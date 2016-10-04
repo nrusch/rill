@@ -13,7 +13,8 @@ from schematics.undefined import Undefined
 from rill.engine.exceptions import TypeHandlerError, PacketValidationError
 from rill.utils import importable_class_name, locate_class
 from rill.compat import *
-from rill.engine.jsonschema_types import to_jsonschema
+from rill.jsonschematics import to_jsonschema
+import rill.typereg
 
 _type_handlers = []
 
@@ -254,6 +255,12 @@ class SchematicsTypeHandler(TypeHandler):
     has_schema = True
 
     def __init__(self, type_def):
+        """
+
+        Parameters
+        ----------
+        type_def : Union[schematics.types.BaseType, Type[schematics.types.BaseType], Type[schematics.models.Model]]
+        """
         if isinstance(type_def, schematics.types.BaseType):
             # nothing to do
             pass
@@ -335,10 +342,11 @@ class SchematicsTypeHandler(TypeHandler):
 
         Parameters
         ----------
-        type
-        type_def
+        type : type
+        type_def : Union[schematics.types.BaseType, Type[schematics.types.BaseType], Type[schematics.models.Model]]
         primitive_type
-        allow_subclasses
+        allow_subclasses : bool
+        overwrite : bool
 
         Returns
         -------
@@ -373,6 +381,9 @@ class SchematicsTypeHandler(TypeHandler):
             cls._subtype_lookup[len(type.mro())].append((type, type_def))
 
         cls._type_lookup[type] = type_def
+
+        if inspect.isclass(type_def):
+            setattr(rill.typereg, type_def.__name__, type_def)
 
 
 def serialize(obj):
@@ -450,6 +461,8 @@ def _register_builtin_types():
     SchematicsTypeHandler.register_type(tuple,
                                         schematics.types.ListType(
                                             schematics.types.BaseType))
+
+    rill.typereg.ListType = schematics.types.ListType
 
 
 _register_builtin_types()

@@ -24,7 +24,9 @@ class RuntimeServer(object):
         self.ctx = zmq.Context()
         # IOLoop reactor
         self.loop = IOLoop.instance()
-        assert isinstance(self.loop, IOLoop)
+
+        if not isinstance(self.loop, IOLoop):
+            raise TypeError("Expected %s, got %s" % (IOLoop, type(self.loop)))
 
         # Set up our client server sockets
 

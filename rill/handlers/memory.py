@@ -7,6 +7,9 @@ from rill.events.listeners.memory import get_graph_messages
 
 from typing import Dict, Iterator
 
+# -----------------------------------------------------------------------------
+# DEPRECATED!  Use RuntimeHandler instead
+# -----------------------------------------------------------------------------
 
 ARG_REPLACEMENTS = (
     ('graph', 'graph_id'),

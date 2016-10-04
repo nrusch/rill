@@ -7,11 +7,10 @@ from functools import wraps
 import gevent
 
 from rill.engine.component import Component
-from rill.engine.network import Graph, Network
+from rill.engine.network import Graph, Network, merge_metadata
 from rill.engine.subnet import SubGraph, make_subgraph
 from rill.engine.types import FBP_TYPES, Stream
 from rill.engine.exceptions import FlowError
-from rill.plumbing import RuntimeServer
 from rill.compat import *
 from rill.utils.observer import supports_listeners
 
@@ -402,18 +401,18 @@ class Runtime(object):
             self.logger.warn('No components were found in module: {}'.format(
                 module.__name__))
 
-    def get_source_code(self, component_name):
-        # FIXME:
-        component = None
-        for graph in self._graphs.values():
-            component = self._find_component_by_name(graph, component_name)
-            if component is not None:
-                break
-
-        if component is None:
-            raise ValueError('No component named {}'.format(component_name))
-
-        return inspect.getsource(component.__class__)
+    # def get_source_code(self, component_name):
+    #     # FIXME:
+    #     component = None
+    #     for graph in self._graphs.values():
+    #         component = self._find_component_by_name(graph, component_name)
+    #         if component is not None:
+    #             break
+    #
+    #     if component is None:
+    #         raise ValueError('No component named {}'.format(component_name))
+    #
+    #     return inspect.getsource(component.__class__)
 
     # Network --
 
@@ -597,7 +596,7 @@ class Runtime(object):
         component.metadata.update(metadata)
         return component.metadata
 
-    def add_edge(self, graph_id, src, tgt, metadata):
+    def add_edge(self, graph_id, src, tgt, metadata=None):
         """
         Connect ports between components.
         """
@@ -610,9 +609,7 @@ class Runtime(object):
         graph.connect(outport, inport)
 
         edge_metadata = inport._connection.metadata.setdefault(outport, {})
-        metadata.setdefault('route', FBP_TYPES[inport.type.get_spec()['type']]['color_id'])
-        edge_metadata.update(metadata)
-
+        merge_metadata(metadata, edge_metadata)
         return edge_metadata
 
     def remove_edge(self, graph_id, src, tgt):
@@ -631,12 +628,7 @@ class Runtime(object):
         outport = self._get_port(graph, src, kind='out')
         inport = self._get_port(graph, tgt, kind='in')
         edge_metadata = inport._connection.metadata.setdefault(outport, {})
-
-        for key, value in metadata.items():
-            if value is None:
-                metadata.pop(key)
-                edge_metadata.pop(key, None)
-        edge_metadata.update(metadata)
+        merge_metadata(metadata, edge_metadata)
         return edge_metadata
 
     def initialize_port(self, graph_id, tgt, data):
@@ -783,23 +775,9 @@ class Runtime(object):
         return graph.change_group(name, nodes, metadata)
 
 
-# FIXME: do we need the host?
-def serve_runtime(runtime=None, host=DEFAULTS['host'], port=DEFAULTS['port'],
-                  registry_host=DEFAULTS['registry_host'],
-                  registry_port=DEFAULTS['registry_port']):
+def serve_runtime(runtime=None):
 
     runtime = runtime if runtime is not None else Runtime()
-
-    def runtime_server_task():
-        server = RuntimeServer(runtime)
-        server.start()
-
-    def local_registration_task():
-        """
-        This greenlet will run the rill registry to register the runtime with
-        the ui.
-        """
-        from rill.registry import serve_registry
-        serve_registry(registry_host, registry_port, host, port)
-
-    runtime_server_task()
+    from rill.plumbing import RuntimeServer
+    server = RuntimeServer(runtime)
+    server.start()

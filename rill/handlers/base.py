@@ -1,3 +1,4 @@
+import logging
 from abc import ABCMeta, abstractmethod
 from rill.compat import *
 
@@ -18,9 +19,11 @@ class GraphHandler(object):
         dispatcher : rill.plumbing.MessageDispatcher
         """
         self.dispatcher = dispatcher
+        self.logger = logging.getLogger('{}.{}'.format(
+            self.__class__.__module__, self.__class__.__name__))
 
     @abstractmethod
-    def recv_message(self, msg):
+    def handle_message(self, msg):
         """
         Handle a FBP graph message
 

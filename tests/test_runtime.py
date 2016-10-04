@@ -1,12 +1,23 @@
+import pytest
+import uuid
+
 from rill.engine.runner import ComponentRunner
 from rill.runtime import Runtime
 from rill.events.listeners.memory import get_graph_messages
 from rill.engine.network import Graph
+from rill.plumbing import Message, MessageDispatcher
 
+from rill.handlers.runtime import RuntimeHandler
+
+from mock import MagicMock, call
 from tests.components import *
+from rill.compat import *
 
 import logging
 ComponentRunner.logger.setLevel(logging.DEBUG)
+
+
+GRAPH_ID = 'graph1'
 
 
 def get_graph(graph_name):
@@ -26,6 +37,80 @@ def get_graph(graph_name):
     graph.export('Outside.IN', 'INPORT')
     return graph, gen, passthru, outside
 
+
+def _iter_client_messages():
+    graph = get_graph("My Graph")[0]
+    for command, payload in get_graph_messages(graph, GRAPH_ID):
+        msg = Message('graph', command, payload,
+                      id=b'xxx')
+        msg.identity = 'foo'
+        yield msg
+
+
+@pytest.fixture
+def client_messages():
+    return list(_iter_client_messages())
+
+
+# @pytest.fixture(params=[InMemoryGraphHandler])
+# def client_messages(request):
+#     graph = get_graph("My Graph")
+#     handler = request.param()
+#     return [Message('graph', *,
+#                     id=bytes(uuid.uuid1()))]
+
+
+class MockDispatcher(MessageDispatcher):
+    def __init__(self):
+        super(MockDispatcher, self).__init__(MagicMock(), MagicMock())
+
+def _remove_message_payload(call_object):
+    args, kwargs = call_object
+    args = args[0][:]
+    # payload
+    args.pop(2)
+    # id
+    args.pop(2)
+    print args
+    return args
+
+
+def test_runtime_handler(client_messages):
+    runtime = Runtime()
+    runtime.register_module('tests.components')
+
+    dispatcher = MockDispatcher()
+
+    publish = dispatcher.publish_socket
+    respond = dispatcher.response_socket
+
+    handler = RuntimeHandler(dispatcher, runtime)
+    for msg in client_messages:
+        handler.handle_message(msg)
+
+    publish_calls = [_remove_message_payload(c) for c
+                     in publish.send_multipart.call_args_list]
+    assert publish_calls == [
+        ['graph', 'clear', '1'],
+        ['graph', 'addnode', '2'],
+        ['graph', 'addnode', '3'],
+        ['graph', 'addnode', '4'],
+        ['graph', 'addinitial', '5'],
+        ['graph', 'addedge', '6'],
+        ['graph', 'addedge', '7'],
+        ['graph', 'addinport', '8'],
+        # adding an inport generates a new component message w/ same revision
+        ['component', 'component', '8'],
+        ['graph', 'addoutport', '9'],
+        # adding an outport generates a new component message w/ same revision
+        ['component', 'component', '9'],
+    ]
+
+    # TODO: test data, started, stopped, portopened, portclosed events
+    # TODO: test that errors are sent on respond socket
+
+
+# -- Delete below here when Runtime is replaced by dispatchers
 
 # FIXME: create a fixture for the network in test_network_serialization and use that here
 def test_get_graph_messages():

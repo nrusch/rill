@@ -26,7 +26,7 @@ class SandboxedGraphHandler(GraphHandler):
         """
         msg.sendto(self._graph[msg.graph_id]['socket'])
 
-    def recv_message(self, msg):
+    def handle_message(self, msg):
         """
         Handle a FBP graph message
 

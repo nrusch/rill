@@ -7,6 +7,7 @@ from zmq.green.eventloop.ioloop import IOLoop
 import zmq.green.eventloop.zmqstream as zmqstream
 
 from rill.runtime.plumbing import Message, MessageDispatcher, dump
+IOLoop.configure(IOLoop)
 
 
 class RuntimeServer(object):

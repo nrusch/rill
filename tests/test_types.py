@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from tests.components import Company, PassthruPerson
-from rill.engine.jsonschema_types import to_jsonschema
+from rill.jsonschematics import to_jsonschema
 
 
 def test_schematics_port():

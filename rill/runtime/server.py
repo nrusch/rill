@@ -55,7 +55,7 @@ class RuntimeServer(object):
         # Run reactor until process interrupted
         try:
             # FIXME: move this to the RuntimeHandler
-            self.runtime.send_network_data.event.listen(
+            self.runtime.send_network_data.event.add_listener(
                 self.handler._send_network_data)
 
             self.loop.start()

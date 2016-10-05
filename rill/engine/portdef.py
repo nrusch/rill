@@ -58,8 +58,7 @@ class PortDefinition(object):
 
     @classmethod
     def from_port(cls, port):
-        klass = InputPortDefinition if port.kind == 'in' else OutputPortDefinition
-        return klass.from_port(port)
+        raise NotImplementedError
 
     def create_port(self, component):
         """

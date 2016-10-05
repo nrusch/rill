@@ -77,13 +77,16 @@ def component(name_or_func=None, **kwargs):
         if kwargs:
             raise ValueError("If you call @component with a callable **kwargs "
                              "is ignored")
+        # name_or_func is the object we are decorating
         f = name_or_func
         name = None
+        # call the decorator immediately
         return decorator(f)
     else:
         # @component('name')
         assert name_or_func is None or isinstance(name_or_func, basestring)
         name = name_or_func
+        # return the decorator
         return decorator
 
 

@@ -43,10 +43,8 @@ logger = LogFormatter(_logger, {})
 @outport(OUT_NULL)
 @add_metaclass(ABCMeta)
 class Component(object):
-    # type: List[rill.engine.portdef.InputPortDefinition]
-    _inport_definitions = []
-    # type: List[rill.engine.portdef.OutputPortDefinition]
-    _outport_definitions = []
+    _inport_definitions = []  # type: List[rill.engine.portdef.InputPortDefinition]
+    _outport_definitions = []  # type: List[rill.engine.portdef.OutputPortDefinition]
     _self_starting = False
     _must_run = False
     type_name = None
@@ -66,12 +64,10 @@ class Component(object):
         self._name = name
 
         # set by the network
-        # type: rill.engine.runner.ComponentRunner
-        self._runner = None
+        self._runner = None  # type: rill.engine.runner.ComponentRunner
 
         # All the input ports are stored here, keyed by name.
-        # type: PortCollection
-        self.ports = None
+        self.ports = None  # type: PortCollection
         self.metadata = {}
 
         # a stack available to each component
@@ -531,6 +527,8 @@ class Component(object):
         """
         # FIXME: lock here?
         return self.network.globals.get(key)
+
+    # -- events
 
     @supports_listeners
     def port_opened(self, port):

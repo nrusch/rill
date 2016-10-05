@@ -47,8 +47,8 @@ class RuntimeHandler(GraphHandler):
         super(RuntimeHandler, self).__init__(dispatcher)
 
         self.runtime = runtime if runtime else Runtime()
-        self.runtime.port_opened.event.listen(self._send_port_opened)
-        self.runtime.port_closed.event.listen(self._send_port_closed)
+        self.runtime.port_opened.event.add_listener(self._send_port_opened)
+        self.runtime.port_closed.event.add_listener(self._send_port_closed)
 
     def get_graph_messages(self, graph_id):
         """
@@ -172,12 +172,12 @@ class RuntimeHandler(GraphHandler):
                 payload['tgt'])
         # IIP / literals
         elif command == 'addinitial':
-            self.runtime.initialize_port(
+            send_component = self.runtime.initialize_port(
                 get_graph(),
                 payload['tgt'],
                 payload['src']['data'])
         elif command == 'removeinitial':
-            self.runtime.uninitialize_port(
+            send_component = self.runtime.uninitialize_port(
                 get_graph(),
                 payload['tgt'])
         # Exported ports

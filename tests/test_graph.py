@@ -517,3 +517,10 @@ def test_set_connection_metadata():
     metadata = inport._connection.metadata.get(outport)
     assert metadata == {'label': 'test'}
 
+
+# TODO: write test
+
+# def callback(port_name, port_index, content, types):
+#     pass
+#
+# Counter.port_initialized.event.add_listener(callback)

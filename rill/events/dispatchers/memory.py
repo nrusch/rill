@@ -403,7 +403,7 @@ class InMemoryGraphDispatcher(GraphDispatcher):
         if target_port.is_initialized():
             # FIXME: so far the case where an uninitialized port receives a uninitialize_port
             # message is when noflo initializes the inport to [] (see initialize_port as well)
-            return graph.uninitialize(target_port)._content
+            graph.uninitialize(target_port)
 
     def _add_export(self, graph_id, node, port, public, metadata=None):
         """

@@ -144,11 +144,10 @@ class InputPort(Port, InputInterface):
         super(InputPort, self).__init__(component, name, **kwargs)
         self.default = default
         self.auto_receive = static
-        # type: BaseConnection
-        self._connection = None
-
-        self.open.event.listen(component.port_opened)
-        self.close.event.listen(component.port_closed)
+        self._connection = None  # type: BaseConnection
+        # forward events from port to component
+        self.open.event.add_listener(component.port_opened)
+        self.close.event.add_listener(component.port_closed)
 
     @supports_listeners
     def open(self):

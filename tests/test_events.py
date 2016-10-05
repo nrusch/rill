@@ -30,7 +30,7 @@ def test_supports_listeners():
     assert object1.test_method.event is not object2.test_method.event
 
     callback = MagicMock()
-    object1.test_method.event.listen(callback)
+    object1.test_method.event.add_listener(callback)
     assert object1.test_method.event is not object2.test_method.event
 
     assert object1.test_method.event is object1.test_method.event

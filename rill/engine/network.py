@@ -210,8 +210,9 @@ class Graph(object):
             else:
                 self.initialize(value, receiver)
 
-        comp.port_opened.event.listen(self.port_opened)
-        comp.port_closed.event.listen(self.port_closed)
+        # forward events from component to graph
+        comp.port_opened.event.add_listener(self.port_opened)
+        comp.port_closed.event.add_listener(self.port_closed)
         return comp
 
     @supports_listeners
@@ -281,10 +282,16 @@ class Graph(object):
 
     @supports_listeners
     def port_opened(self, component, port):
+        """
+        Aggregates all port_opened events for the graph.
+        """
         self.port_opened.event.emit(self, component, port)
 
     @supports_listeners
     def port_closed(self, component, port):
+        """
+        Aggregates all port_closed events for the graph.
+        """
         self.port_closed.event.emit(self, component, port)
 
     @supports_listeners
@@ -658,7 +665,12 @@ class Graph(object):
         ----------
         content : Any
         receiver : Union[``rill.engine.inputport.InputPort``, str]
-        force : bool
+
+        Returns
+        -------
+        bool :
+            whether the change resulted in an update of the component's type
+            schemas
         """
         inport = self.get_component_port(receiver, kind='in')
         inport.initialize(content)
@@ -675,8 +687,9 @@ class Graph(object):
 
         Returns
         -------
-        ``rill.engine.inputport.InitializationConnection``
-            The removed initialization connection
+        bool :
+            whether the change resulted in an update of the component's type
+            schemas
         """
         inport = self.get_component_port(receiver, kind='in')
         result = inport.uninitialize()
@@ -961,12 +974,12 @@ class Network(object):
             for inport in comp.inports:
                 if getattr(inport, '_connection', False):
                     if isinstance(inport._connection, Connection):
-                        inport._connection.send.event.listen(self.send_data)
+                        inport._connection.send.event.add_listener(self.send_data)
                         self.connection_listeners.append(inport._connection)
                 elif getattr(inport, '_connections', False):
                     for connection in inport._connections:
                         if isinstance(connection, Connection):
-                            connection.send.event.listen(self.send_data)
+                            connection.send.event.add_listener(self.send_data)
                             self.connection_listeners.append(connection)
 
         try:

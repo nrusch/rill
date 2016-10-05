@@ -42,8 +42,9 @@ class OutputPort(Port, OutputInterface):
         self._sender_count = 0
         # type: List[rill.engine.inputport.Connection]
         self._connections = []
-        self.open.event.listen(component.port_opened)
-        self.close.event.listen(component.port_closed)
+        # forward events from port to component
+        self.open.event.add_listener(component.port_opened)
+        self.close.event.add_listener(component.port_closed)
 
     @supports_listeners
     def open(self):

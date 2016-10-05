@@ -452,7 +452,7 @@ class Runtime(object):
         graph = self.get_graph(graph_id)
 
         network = Network(graph)
-        network.send_data.event.listen(self.send_network_data)
+        network.send_data.event.add_listener(self.send_network_data)
 
         executor = gevent.Greenlet(network.go)
         executor.network = network
@@ -542,8 +542,9 @@ class Runtime(object):
             Register the graph as a component
         """
         self._graphs[graph_id] = graph
-        graph.port_opened.event.listen(self.port_opened)
-        graph.port_closed.event.listen(self.port_closed)
+        # forward events from graph to runtime
+        graph.port_opened.event.add_listener(self.port_opened)
+        graph.port_closed.event.add_listener(self.port_closed)
 
         if register:
             self.register_graph_component(graph)
@@ -636,6 +637,12 @@ class Runtime(object):
     def initialize_port(self, graph_id, tgt, data):
         """
         Set the inital packet for a component inport.
+
+        Returns
+        -------
+        bool :
+            whether the change resulted in an update of the component's type
+            schemas
         """
         self.logger.info('Graph {}: Setting IIP to {!r} on port {}'.format(
             graph_id, data, tgt))
@@ -643,7 +650,7 @@ class Runtime(object):
         # FIXME: noflo-ui is sending an 'addinitial foo.IN []' even when
         # the inport is connected
         if data == []:
-            return
+            return False
 
         graph = self.get_graph(graph_id)
 
@@ -654,11 +661,17 @@ class Runtime(object):
         # FIXME: handle deserialization?
         if not target_port.auto_receive:
             data = Stream(data)
-        graph.initialize(data, target_port)
+        return graph.initialize(data, target_port)
 
     def uninitialize_port(self, graph_id, tgt):
         """
         Remove the initial packet for a component inport.
+
+        Returns
+        -------
+        bool :
+            whether the change resulted in an update of the component's type
+            schemas
         """
         self.logger.debug('Graph {}: Removing IIP from port {}'.format(
             graph_id, tgt))
@@ -669,7 +682,8 @@ class Runtime(object):
         if target_port.is_initialized():
             # FIXME: so far the case where an uninitialized port receives a uninitialize_port
             # message is when noflo initializes the inport to [] (see initialize_port as well)
-            return graph.uninitialize(target_port)._content
+            return graph.uninitialize(target_port)
+        return False
 
     def add_export(self, graph_id, node, port, public, metadata=None):
         """

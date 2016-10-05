@@ -1,12 +1,14 @@
+from __future__ import absolute_import, print_function
+
 
 def importable_class_name(klass, assert_valid=False):
-    '''
+    """
     Create an string to use for locating the given class.
 
     Returns
     -------
     str
-    '''
+    """
     import pydoc
     if klass.__module__ == '__builtin__':
         name = klass.__name__

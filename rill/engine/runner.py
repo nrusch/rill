@@ -1,11 +1,11 @@
-import logging
+from __future__ import absolute_import, print_function
+
 from threading import Condition
 
 from gevent import Greenlet, GreenletExit
 from gevent.lock import RLock
 from termcolor import colored
 
-from rill.engine.utils import LogFormatter
 from rill.engine.status import StatusValues
 from rill.engine.exceptions import FlowError, ComponentError
 from rill.engine.port import OUT_NULL, IN_NULL

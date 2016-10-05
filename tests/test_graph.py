@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function
+
 import pytest
 
 from rill.engine.network import Graph

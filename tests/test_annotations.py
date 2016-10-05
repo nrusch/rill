@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function
+
 from rill.utils.annotations import Annotation, ProxyAnnotation, FlagAnnotation
 import pytest
 

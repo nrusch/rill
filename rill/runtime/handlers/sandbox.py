@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import subprocess
 import sys
 from rill.runtime.handlers.base import GraphHandler
@@ -79,7 +81,7 @@ if __name__ == '__main__':
         context = zmq.Context()
         socket_pull = context.socket(zmq.PULL)
         socket_pull.connect("tcp://localhost:%s" % recv_port)
-        print "Connected to server with port %s" % recv_port
+        print("Connected to server with port %s" % recv_port)
         # Initialize poll set
         poller = zmq.Poller()
         poller.register(socket_pull, zmq.POLLIN)

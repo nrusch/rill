@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function
+
 from collections import OrderedDict
 from tests.components import Company, PassthruPerson
 from rill.jsonschematics import to_jsonschema

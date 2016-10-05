@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import pytest
 import uuid
 
@@ -70,7 +72,6 @@ def _remove_message_payload(call_object):
     args.pop(2)
     # id
     args.pop(2)
-    print args
     return args
 
 

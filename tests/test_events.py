@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function
+
 from rill.events.dispatchers.base import GraphDispatcher
 from rill.events.dispatchers.memory import InMemoryGraphDispatcher
 from rill.events.listeners.memory import InMemoryGraphListener

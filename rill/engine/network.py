@@ -3,6 +3,8 @@ This module is responsible for applying gevent monkey patching, so it should
 be imported before all others if you intend to process a network in the current
 python process.
 """
+from __future__ import absolute_import, print_function
+
 from collections import defaultdict, OrderedDict
 from inspect import isclass
 import time

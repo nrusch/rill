@@ -674,7 +674,12 @@ class Graph(object):
         """
         inport = self.get_component_port(receiver, kind='in')
         inport.initialize(content)
+        type_defs = {p._name: p.type.type_def
+                     for p in inport.component.inports if p.type}
+        updated = inport.component.port_initialized(
+            inport._name, inport.index, content, type_defs)
         self.initialize.event.emit(inport, content)
+        return updated
 
     @supports_listeners
     def uninitialize(self, receiver):
@@ -692,9 +697,13 @@ class Graph(object):
             schemas
         """
         inport = self.get_component_port(receiver, kind='in')
-        result = inport.uninitialize()
+        inport.uninitialize()
+        type_defs = {p._name: p.type.type_def
+                     for p in inport.component.inports if p.type}
+        updated = inport.component.port_uninitialized(
+            inport._name, inport.index, type_defs)
         self.uninitialize.event.emit(inport)
-        return result
+        return updated
 
     def validate(self):
         """

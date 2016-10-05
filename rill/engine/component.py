@@ -538,6 +538,18 @@ class Component(object):
     def port_closed(self, port):
         self.port_closed.event.emit(self, port)
 
+    @supports_listeners
+    def port_initialized(self, port_name, port_index, new_value, types):
+        results = self.port_initialized.event.emit(port_name, port_index,
+                                                   new_value, types)
+        return any(results.values())
+
+    @supports_listeners
+    def port_uninitialized(self, port_name, port_index, types):
+        results = self.port_uninitialized.event.emit(port_name, port_index,
+                                                     types)
+        return any(results.values())
+
 
 class _FunctionComponent(Component):
     """
